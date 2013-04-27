@@ -23,11 +23,19 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
+import javax.persistence.Transient;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 import org.joda.time.DateTime;
 
 import com.ning.billing.ErrorCode;
@@ -53,19 +61,31 @@ import com.ning.billing.util.clock.Clock;
 import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
-
+@Entity
 @XmlRootElement(name = "catalog")
 @XmlAccessorType(XmlAccessType.NONE)
 public class VersionedCatalog extends ValidatingConfig<StandaloneCatalog> implements Catalog, StaticCatalog {
 
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
+    
+    @Transient
     private final Clock clock;
     private String catalogName;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElement(name = "catalogVersion", required = true)
     private final List<StandaloneCatalog> versions = new ArrayList<StandaloneCatalog>();
 
     public VersionedCatalog(final Clock clock) {
         this.clock = clock;
+    }
+
+    public VersionedCatalog() {
+        this.clock = null;//XXX
     }
 
     //

@@ -16,10 +16,12 @@
 
 package com.ning.billing.catalog.rules;
 
+import javax.persistence.Embeddable;
 import javax.xml.bind.annotation.XmlElement;
 
 import com.ning.billing.catalog.api.BillingAlignment;
 
+@Embeddable
 public class CaseBillingAlignment extends CasePhase<BillingAlignment> {
 
     @XmlElement(required = true)

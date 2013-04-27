@@ -16,6 +16,11 @@
 
 package com.ning.billing.catalog.rules;
 
+import javax.persistence.Embeddable;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.ManyToOne;
+import javax.persistence.OneToOne;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlIDREF;
 
@@ -24,21 +29,27 @@ import com.ning.billing.catalog.DefaultProduct;
 import com.ning.billing.catalog.api.BillingPeriod;
 import com.ning.billing.catalog.api.ProductCategory;
 
+@Embeddable
 public class CasePriceList extends Case<DefaultPriceList> {
+    @ManyToOne
     @XmlElement(required = false, name = "fromProduct")
     @XmlIDREF
     private DefaultProduct fromProduct;
 
+    @Enumerated(EnumType.STRING)
     @XmlElement(required = false, name = "fromProductCategory")
     private ProductCategory fromProductCategory;
 
+    @Enumerated(EnumType.STRING)
     @XmlElement(required = false, name = "fromBillingPeriod")
     private BillingPeriod fromBillingPeriod;
 
+    @ManyToOne
     @XmlElement(required = false, name = "fromPriceList")
     @XmlIDREF
     private DefaultPriceList fromPriceList;
 
+    @ManyToOne
     @XmlElement(required = true, name = "toPriceList")
     @XmlIDREF
     private DefaultPriceList toPriceList;

@@ -16,11 +16,13 @@
 
 package com.ning.billing.catalog.rules;
 
+import javax.persistence.Embeddable;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlSeeAlso;
 
 import com.ning.billing.catalog.api.ActionPolicy;
 
+@Embeddable
 @XmlSeeAlso(CaseChange.class)
 public class CaseChangePlanPolicy extends CaseChange<ActionPolicy> {
 

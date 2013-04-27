@@ -16,6 +16,18 @@
 
 package com.ning.billing.catalog;
 
+import java.net.URI;
+import java.util.Arrays;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
+import javax.persistence.OneToMany;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -23,8 +35,9 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlID;
 import javax.xml.bind.annotation.XmlIDREF;
-import java.net.URI;
-import java.util.Arrays;
+
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 
 import com.ning.billing.catalog.api.Limit;
 import com.ning.billing.catalog.api.Product;
@@ -32,10 +45,16 @@ import com.ning.billing.catalog.api.ProductCategory;
 import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultProduct extends ValidatingConfig<StandaloneCatalog> implements Product {
-    private static final DefaultProduct[] EMPTY_PRODUCT_LIST = new DefaultProduct[0];
+ 
 
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
+
+    @Column(name="product_name")
     @XmlAttribute(required = true)
     @XmlID
     private String name;
@@ -46,16 +65,33 @@ public class DefaultProduct extends ValidatingConfig<StandaloneCatalog> implemen
     @XmlElement(required = true)
     private ProductCategory category;
 
+
+    @CollectionOfElements
+    @ManyToMany(cascade = {CascadeType.ALL})
+    @JoinTable(name="catalog_product_includes", 
+                joinColumns={@JoinColumn(name="product_id")}, 
+                inverseJoinColumns={@JoinColumn(name="included_id")})
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "included", required = false)
     @XmlIDREF
     @XmlElement(name = "addonProduct", required = true)
-    private DefaultProduct[] included = EMPTY_PRODUCT_LIST;
+    private DefaultProduct[] included = new DefaultProduct[0];
 
+    @CollectionOfElements
+    @ManyToMany(cascade = {CascadeType.ALL})
+    @JoinTable(name="catalog_product_available", 
+    joinColumns={@JoinColumn(name="product_id")}, 
+    inverseJoinColumns={@JoinColumn(name="available_id")})
+
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "available", required = false)
     @XmlIDREF
     @XmlElement(name = "addonProduct", required = true)
-    private DefaultProduct[] available = EMPTY_PRODUCT_LIST;
+    private DefaultProduct[] available = new DefaultProduct[0];
     
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "limits", required = false)
     @XmlElement(name = "limit", required = true)
     private DefaultLimit[] limits = new DefaultLimit[0];

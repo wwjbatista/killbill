@@ -16,18 +16,27 @@
 
 package com.ning.billing.catalog;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlID;
 
+import org.hibernate.annotations.AccessType;
+
 import com.ning.billing.catalog.api.Unit;
 import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultUnit extends ValidatingConfig<StandaloneCatalog> implements Unit {
-    
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
+
     @XmlAttribute(required = true)
     @XmlID
     private String name;

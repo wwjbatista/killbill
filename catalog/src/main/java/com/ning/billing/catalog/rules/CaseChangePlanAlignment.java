@@ -16,10 +16,12 @@
 
 package com.ning.billing.catalog.rules;
 
+import javax.persistence.Embeddable;
 import javax.xml.bind.annotation.XmlElement;
 
 import com.ning.billing.catalog.api.PlanAlignmentChange;
 
+@Embeddable
 public class CaseChangePlanAlignment extends CaseChange<PlanAlignmentChange> {
 
     @XmlElement(required = true)

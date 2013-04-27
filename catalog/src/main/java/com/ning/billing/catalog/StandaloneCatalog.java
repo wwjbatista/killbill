@@ -22,11 +22,21 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
+
+import org.hibernate.annotations.AccessType;
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 
 import com.ning.billing.ErrorCode;
 import com.ning.billing.catalog.api.ActionPolicy;
@@ -34,7 +44,6 @@ import com.ning.billing.catalog.api.BillingAlignment;
 import com.ning.billing.catalog.api.BillingPeriod;
 import com.ning.billing.catalog.api.CatalogApiException;
 import com.ning.billing.catalog.api.Currency;
-import com.ning.billing.catalog.api.Limit;
 import com.ning.billing.catalog.api.Listing;
 import com.ning.billing.catalog.api.Plan;
 import com.ning.billing.catalog.api.PlanAlignmentChange;
@@ -52,9 +61,14 @@ import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationError;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlRootElement(name = "catalog")
 @XmlAccessorType(XmlAccessType.NONE)
 public class StandaloneCatalog extends ValidatingConfig<StandaloneCatalog> implements StaticCatalog {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
+
     @XmlElement(required = true)
     private Date effectiveDate;
 
@@ -63,25 +77,38 @@ public class StandaloneCatalog extends ValidatingConfig<StandaloneCatalog> imple
 
     private URI catalogURI;
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "currencies", required = true)
     @XmlElement(name = "currency", required = true)
     private Currency[] supportedCurrencies;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "units", required = false)
     @XmlElement(name = "unit", required = true)
     private DefaultUnit[] units;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "products", required = true)
     @XmlElement(name = "product", required = true)
     private DefaultProduct[] products;
 
+    @OneToOne(cascade = CascadeType.ALL)
     @XmlElement(name = "rules", required = true)
     private PlanRules planRules;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "plans", required = true)
     @XmlElement(name = "plan", required = true)
     private DefaultPlan[] plans;
 
+    @OneToOne(cascade = CascadeType.ALL)
     @XmlElement(name = "priceLists", required = true)
     private DefaultPriceListSet priceLists;
 

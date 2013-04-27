@@ -16,11 +16,18 @@
 
 package com.ning.billing.catalog;
 
+import java.math.BigDecimal;
+import java.net.URI;
+
+import javax.persistence.Embeddable;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.math.BigDecimal;
-import java.net.URI;
+
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 
 import com.ning.billing.ErrorCode;
 import com.ning.billing.catalog.api.CatalogApiException;
@@ -31,14 +38,23 @@ import com.ning.billing.catalog.api.Price;
 import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Embeddable
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultInternationalPrice extends ValidatingConfig<StandaloneCatalog> implements InternationalPrice {
 
     //TODO: Must have a price point for every configured currency
     //TODO: No prices is a zero cost plan
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElement(name = "price")
-    private DefaultPrice[] prices;
+    private DefaultPrice[] prices = new DefaultPrice[0];
 
+    public DefaultInternationalPrice() {
+    }   
+
+    public DefaultInternationalPrice(final DefaultPrice... price) {
+        setPrices(price);
+    }
 
     /* (non-Javadoc)
       * @see com.ning.billing.catalog.InternationalPrice#getPrices()

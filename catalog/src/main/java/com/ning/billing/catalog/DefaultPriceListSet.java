@@ -16,11 +16,21 @@
 
 package com.ning.billing.catalog;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.util.ArrayList;
-import java.util.List;
+
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 
 import com.ning.billing.ErrorCode;
 import com.ning.billing.catalog.api.BillingPeriod;
@@ -32,11 +42,20 @@ import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationError;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultPriceListSet extends ValidatingConfig<StandaloneCatalog> {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
+    
+    @OneToOne(cascade = CascadeType.ALL)
     @XmlElement(required = true, name = "defaultPriceList")
     private PriceListDefault defaultPricelist;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElement(required = false, name = "childPriceList")
     private DefaultPriceList[] childPriceLists = new DefaultPriceList[0];
 

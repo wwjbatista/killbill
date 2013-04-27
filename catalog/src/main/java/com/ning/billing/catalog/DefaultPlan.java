@@ -22,6 +22,14 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
+import javax.persistence.PrimaryKeyJoinColumn;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -30,6 +38,8 @@ import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlID;
 import javax.xml.bind.annotation.XmlIDREF;
 
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 import org.joda.time.DateTime;
 
 import com.ning.billing.ErrorCode;
@@ -43,9 +53,14 @@ import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationError;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultPlan extends ValidatingConfig<StandaloneCatalog> implements Plan {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
 
+    
     @XmlAttribute(required = true)
     @XmlID
     private String name;
@@ -57,14 +72,21 @@ public class DefaultPlan extends ValidatingConfig<StandaloneCatalog> implements 
     @XmlElement(required = false)
     private Date effectiveDateForExistingSubscriptons;
 
+    @ManyToOne(cascade = CascadeType.ALL)
+    @PrimaryKeyJoinColumn
     @XmlElement(required = true)
     @XmlIDREF
     private DefaultProduct product;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "initialPhases", required = false)
     @XmlElement(name = "phase", required = true)
     private DefaultPlanPhase[] initialPhases = new DefaultPlanPhase[0];
 
+    @OneToOne(cascade = CascadeType.ALL)
+    @PrimaryKeyJoinColumn
     @XmlElement(name = "finalPhase", required = true)
     private DefaultPlanPhase finalPhase;
 

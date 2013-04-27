@@ -16,10 +16,17 @@
 
 package com.ning.billing.catalog;
 
+import java.math.BigDecimal;
+
+import javax.persistence.Embeddable;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.math.BigDecimal;
 
 import com.ning.billing.catalog.api.Currency;
 import com.ning.billing.catalog.api.CurrencyValueNull;
@@ -27,8 +34,11 @@ import com.ning.billing.catalog.api.Price;
 import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Embeddable
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultPrice extends ValidatingConfig<StandaloneCatalog> implements Price {
+    
+    @Enumerated(EnumType.STRING)
     @XmlElement(required = true)
     private Currency currency;
 

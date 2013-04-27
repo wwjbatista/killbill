@@ -36,6 +36,7 @@ public class VersionedCatalogLoader implements ICatalogLoader {
     private final String XML_EXTENSION = ".xml";
     private final Clock clock;
 
+    
     @Inject
     public VersionedCatalogLoader(final Clock clock) {
         this.clock = clock;

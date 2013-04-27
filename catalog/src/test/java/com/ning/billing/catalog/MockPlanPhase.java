@@ -111,7 +111,7 @@ public class MockPlanPhase extends DefaultPlanPhase {
         setPlan(mockPlan);
     }
 
-    public MockPlanPhase(final Plan plan, final PhaseType phaseType) {
+    public MockPlanPhase(final DefaultPlan plan, final PhaseType phaseType) {
         setBillingPeriod(BillingPeriod.MONTHLY);
         setPhaseType(phaseType);
         setDuration(new DefaultDuration().setNumber(-1).setUnit(TimeUnit.UNLIMITED));

@@ -18,6 +18,12 @@ package com.ning.billing.catalog;
 
 import java.net.URI;
 
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.OneToOne;
+import javax.persistence.PrimaryKeyJoinColumn;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -37,8 +43,12 @@ import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationError;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultPlanPhase extends ValidatingConfig<StandaloneCatalog> implements PlanPhase {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
 
     @XmlAttribute(required = true)
     private PhaseType type;
@@ -59,12 +69,10 @@ public class DefaultPlanPhase extends ValidatingConfig<StandaloneCatalog> implem
     @XmlElement(name = "limit", required = true)
     private DefaultLimit[] limits = new DefaultLimit[0];
 
-//  Not supported: variable pricing
-//	@XmlElement(required=false)
-//	private InternationalPrice unitPrice;
-
     //Not exposed in XML
-    private Plan plan;
+    @OneToOne(cascade = CascadeType.ALL)
+    @PrimaryKeyJoinColumn
+    private DefaultPlan plan;
 
     public static String phaseName(final String planName, final PhaseType phasetype) {
         return planName + "-" + phasetype.toString().toLowerCase();
@@ -78,7 +86,18 @@ public class DefaultPlanPhase extends ValidatingConfig<StandaloneCatalog> implem
         }
         throw new CatalogApiException(ErrorCode.CAT_BAD_PHASE_NAME, phaseName);
     }
+    
+    DefaultPlanPhase(){}
 
+    DefaultPlanPhase(PhaseType type, DefaultDuration duration, BillingPeriod billingPeriod,
+            DefaultInternationalPrice recurringPrice, DefaultInternationalPrice fixedPrice, DefaultLimit[] limits) {
+        this.type = type;
+        this.duration = duration;
+        this.billingPeriod = billingPeriod;
+        this.recurringPrice = recurringPrice;
+        this.fixedPrice = fixedPrice;
+        this.limits = limits = new DefaultLimit[0];
+    }
 
     /* (non-Javadoc)
       * @see com.ning.billing.catalog.IPlanPhase#getRecurringPrice()
@@ -241,7 +260,7 @@ public class DefaultPlanPhase extends ValidatingConfig<StandaloneCatalog> implem
         return this;
     }
 
-    protected DefaultPlanPhase setPlan(final Plan plan) {
+    protected DefaultPlanPhase setPlan(final DefaultPlan plan) {
         this.plan = plan;
         return this;
     }

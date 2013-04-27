@@ -16,6 +16,10 @@
 
 package com.ning.billing.catalog;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.ManyToOne;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -26,8 +30,14 @@ import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationError;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultLimit extends ValidatingConfig<StandaloneCatalog> implements Limit {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
+   
+    @ManyToOne
     @XmlElement(required = true)
     @XmlIDREF
     private DefaultUnit unit;
@@ -42,6 +52,7 @@ public class DefaultLimit extends ValidatingConfig<StandaloneCatalog> implements
     /* (non-Javadoc)
      * @see com.ning.billing.catalog.Limit#getUnit()
      */
+    
     @Override
     public DefaultUnit getUnit() {
         return unit;

@@ -16,6 +16,7 @@
 
 package com.ning.billing.catalog.rules;
 
+import javax.persistence.OneToOne;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -39,6 +40,7 @@ public abstract class CaseChange<T> extends ValidatingConfig<StandaloneCatalog> 
     @XmlElement(required = false)
     private PhaseType phaseType;
 
+    @OneToOne
     @XmlElement(required = false)
     @XmlIDREF
     private DefaultProduct fromProduct;

@@ -16,6 +16,11 @@
 
 package com.ning.billing.catalog;
 
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
@@ -24,6 +29,9 @@ import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlID;
 import javax.xml.bind.annotation.XmlIDREF;
 
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
+
 import com.ning.billing.catalog.api.BillingPeriod;
 import com.ning.billing.catalog.api.PriceList;
 import com.ning.billing.catalog.api.Product;
@@ -31,8 +39,12 @@ import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationError;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class DefaultPriceList extends ValidatingConfig<StandaloneCatalog> implements PriceList {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
 
     @XmlAttribute(required = true)
     @XmlID
@@ -41,6 +53,9 @@ public class DefaultPriceList extends ValidatingConfig<StandaloneCatalog> implem
     @XmlAttribute(required = false)
     private Boolean retired = false;
 
+    @CollectionOfElements
+    @OneToMany(cascade = CascadeType.ALL)
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "plans", required = true)
     @XmlIDREF
     @XmlElement(name = "plan", required = true)

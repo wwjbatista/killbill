@@ -16,10 +16,16 @@
 
 package com.ning.billing.catalog.rules;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
+
+import org.hibernate.annotations.CollectionOfElements;
+import org.hibernate.annotations.IndexColumn;
 
 import com.ning.billing.catalog.DefaultPriceList;
 import com.ning.billing.catalog.StandaloneCatalog;
@@ -35,29 +41,45 @@ import com.ning.billing.catalog.api.PlanSpecifier;
 import com.ning.billing.util.config.catalog.ValidatingConfig;
 import com.ning.billing.util.config.catalog.ValidationErrors;
 
+@Entity
 @XmlAccessorType(XmlAccessType.NONE)
 public class PlanRules extends ValidatingConfig<StandaloneCatalog> {
+    @SuppressWarnings("unused")
+    @Id @GeneratedValue 
+    private long id; // set id automatically
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "changePolicy")
     @XmlElement(name = "changePolicyCase", required = false)
     private CaseChangePlanPolicy[] changeCase;
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "changeAlignment")
     @XmlElement(name = "changeAlignmentCase", required = false)
     private CaseChangePlanAlignment[] changeAlignmentCase;
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "cancelPolicy")
     @XmlElement(name = "cancelPolicyCase", required = false)
     private CaseCancelPolicy[] cancelCase;
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "createAlignment")
     @XmlElement(name = "createAlignmentCase", required = false)
     private CaseCreateAlignment[] createAlignmentCase;
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "billingAlignment")
     @XmlElement(name = "billingAlignmentCase", required = false)
     private CaseBillingAlignment[] billingAlignmentCase;
 
+    @CollectionOfElements
+    @IndexColumn(name="id")
     @XmlElementWrapper(name = "priceList")
     @XmlElement(name = "priceListCase", required = false)
     private CasePriceList[] priceListCase;
