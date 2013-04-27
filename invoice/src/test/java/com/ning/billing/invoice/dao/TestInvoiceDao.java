@@ -16,8 +16,6 @@
 
 package com.ning.billing.invoice.dao;
 
-import static com.ning.billing.invoice.TestInvoiceHelper.*;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -69,6 +67,11 @@ import com.ning.billing.util.svcapi.junction.BillingModeType;
 
 import com.google.common.collect.ImmutableMap;
 
+import static com.ning.billing.invoice.TestInvoiceHelper.FIFTEEN;
+import static com.ning.billing.invoice.TestInvoiceHelper.FIVE;
+import static com.ning.billing.invoice.TestInvoiceHelper.TEN;
+import static com.ning.billing.invoice.TestInvoiceHelper.TWENTY;
+import static com.ning.billing.invoice.TestInvoiceHelper.ZERO;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -124,7 +127,6 @@ public class TestInvoiceDao extends InvoiceTestSuiteWithEmbeddedDB {
         final InvoiceModelDao savedInvoice = invoiceDao.getById(invoiceId, internalCallContext);
         assertNotNull(savedInvoice);
         assertEquals(InvoiceModelDaoHelper.getBalance(savedInvoice).compareTo(new BigDecimal("21.00")), 0);
-        assertEquals(InvoiceModelDaoHelper.getPaidAmount(savedInvoice), BigDecimal.ZERO);
         assertEquals(savedInvoice.getInvoiceItems().size(), 1);
 
         final BigDecimal paymentAmount = new BigDecimal("11.00");
@@ -136,9 +138,7 @@ public class TestInvoiceDao extends InvoiceTestSuiteWithEmbeddedDB {
         final InvoiceModelDao retrievedInvoice = invoiceDao.getById(invoiceId, internalCallContext);
         assertNotNull(retrievedInvoice);
         assertEquals(retrievedInvoice.getInvoiceItems().size(), 1);
-        assertEquals(InvoiceModelDaoHelper.getChargedAmount(retrievedInvoice).compareTo(new BigDecimal("21.00")), 0);
         assertEquals(InvoiceModelDaoHelper.getBalance(retrievedInvoice).compareTo(new BigDecimal("10.00")), 0);
-        assertEquals(InvoiceModelDaoHelper.getPaidAmount(retrievedInvoice).compareTo(new BigDecimal("11.00")), 0);
     }
 
     @Test(groups = "slow")
@@ -1059,10 +1059,10 @@ public class TestInvoiceDao extends InvoiceTestSuiteWithEmbeddedDB {
         invoiceUtil.createInvoice(invoice2, true, internalCallContext);
 
         final InvoiceModelDao savedInvoice1 = invoiceDao.getById(invoice1.getId(), internalCallContext);
-        assertEquals(InvoiceModelDaoHelper.getBalance(savedInvoice1), ZERO);
+        assertEquals(InvoiceModelDaoHelper.getBalance(savedInvoice1), FIVE);
 
         final InvoiceModelDao savedInvoice2 = invoiceDao.getById(invoice2.getId(), internalCallContext);
-        assertEquals(InvoiceModelDaoHelper.getBalance(savedInvoice2), FIFTEEN);
+        assertEquals(InvoiceModelDaoHelper.getBalance(savedInvoice2), TEN);
     }
 
     @Test(groups = "slow")

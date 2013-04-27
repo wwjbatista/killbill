@@ -40,10 +40,13 @@ import com.ning.billing.analytics.dao.BusinessSubscriptionTransitionFieldSqlDao;
 import com.ning.billing.analytics.dao.BusinessSubscriptionTransitionSqlDao;
 import com.ning.billing.analytics.dao.BusinessSubscriptionTransitionTagSqlDao;
 import com.ning.billing.analytics.glue.TestAnalyticsModuleWithEmbeddedDB;
+import com.ning.billing.analytics.setup.AnalyticsModule;
 import com.ning.billing.catalog.api.CatalogService;
+import com.ning.billing.dbi.DBTestingHelper;
 import com.ning.billing.entitlement.api.user.EntitlementUserApi;
 import com.ning.billing.invoice.api.InvoiceUserApi;
 import com.ning.billing.invoice.dao.InvoiceDao;
+import com.ning.billing.junction.api.JunctionApi;
 import com.ning.billing.payment.dao.PaymentDao;
 import com.ning.billing.util.glue.RealImplementation;
 import com.ning.billing.util.svcapi.account.AccountInternalApi;
@@ -123,9 +126,15 @@ public abstract class AnalyticsTestSuiteWithEmbeddedDB extends GuicyKillbillTest
     protected BusinessSubscriptionTransitionSqlDao subscriptionTransitionSqlDao;
     @Inject
     protected BusinessTagDao tagDao;
+    @Inject
+    protected JunctionApi junctionApi;
 
     @BeforeClass(groups = "slow")
     protected void beforeClass() throws Exception {
+        configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "url", getDBTestingHelper().getJdbcConnectionString());
+        configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "user", DBTestingHelper.USERNAME);
+        configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "password", DBTestingHelper.PASSWORD);
+
         final Injector injector = Guice.createInjector(new TestAnalyticsModuleWithEmbeddedDB(configSource));
         injector.injectMembers(this);
     }

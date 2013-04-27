@@ -17,6 +17,7 @@
 package com.ning.billing.beatrix.integration;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import com.ning.billing.account.api.AccountService;
 import com.ning.billing.account.api.AccountUserApi;
 import com.ning.billing.analytics.AnalyticsListener;
 import com.ning.billing.analytics.api.user.DefaultAnalyticsUserApi;
+import com.ning.billing.analytics.setup.AnalyticsModule;
 import com.ning.billing.api.TestApiListener;
 import com.ning.billing.api.TestApiListener.NextEvent;
 import com.ning.billing.api.TestListenerStatus;
@@ -56,6 +58,7 @@ import com.ning.billing.catalog.api.Currency;
 import com.ning.billing.catalog.api.PlanPhaseSpecifier;
 import com.ning.billing.catalog.api.PriceListSet;
 import com.ning.billing.catalog.api.ProductCategory;
+import com.ning.billing.dbi.DBTestingHelper;
 import com.ning.billing.entitlement.api.EntitlementService;
 import com.ning.billing.entitlement.api.timeline.EntitlementTimelineApi;
 import com.ning.billing.entitlement.api.transfer.EntitlementTransferApi;
@@ -78,7 +81,9 @@ import com.ning.billing.payment.api.Payment;
 import com.ning.billing.payment.api.PaymentApi;
 import com.ning.billing.payment.api.PaymentApiException;
 import com.ning.billing.payment.api.PaymentMethodPlugin;
+import com.ning.billing.payment.api.TestPaymentMethodPluginBase;
 import com.ning.billing.payment.provider.MockPaymentProviderPlugin;
+import com.ning.billing.util.api.RecordIdApi;
 import com.ning.billing.util.api.TagUserApi;
 import com.ning.billing.util.config.OSGIConfig;
 import com.ning.billing.util.svcapi.account.AccountInternalApi;
@@ -197,6 +202,8 @@ public class TestIntegrationBase extends BeatrixTestSuiteWithEmbeddedDB implemen
     @Inject
     protected OSGIConfig osgiConfig;
 
+    @Inject
+    protected RecordIdApi recordIdApi;
 
     protected TestApiListener busHandler;
 
@@ -224,6 +231,10 @@ public class TestIntegrationBase extends BeatrixTestSuiteWithEmbeddedDB implemen
 
     @BeforeClass(groups = "slow")
     public void beforeClass() throws Exception {
+        configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "url", getDBTestingHelper().getJdbcConnectionString());
+        configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "user", DBTestingHelper.USERNAME);
+        configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "password", DBTestingHelper.PASSWORD);
+
         final Injector g = Guice.createInjector(Stage.PRODUCTION, new BeatrixIntegrationModule(configSource));
         g.injectMembers(this);
         busHandler = new TestApiListener(this);
@@ -238,6 +249,10 @@ public class TestIntegrationBase extends BeatrixTestSuiteWithEmbeddedDB implemen
     public void beforeMethod() throws Exception {
 
         super.beforeMethod();
+
+        log.info("beforeMethod context classLoader = " + (Thread.currentThread().getContextClassLoader() != null ? Thread.currentThread().getContextClassLoader().toString() : "null"));
+        //Thread.currentThread().setContextClassLoader(null);
+
         log.warn("\n");
         log.warn("RESET TEST FRAMEWORK\n\n");
 
@@ -258,6 +273,8 @@ public class TestIntegrationBase extends BeatrixTestSuiteWithEmbeddedDB implemen
         lifecycle.fireShutdownSequencePriorEventUnRegistration();
         busService.getBus().unregister(busHandler);
         lifecycle.fireShutdownSequencePostEventUnRegistration();
+
+        log.info("afterMethod context classLoader = " + (Thread.currentThread().getContextClassLoader() != null ? Thread.currentThread().getContextClassLoader().toString() : "null"));
 
         log.warn("DONE WITH TEST\n");
     }
@@ -318,30 +335,24 @@ public class TestIntegrationBase extends BeatrixTestSuiteWithEmbeddedDB implemen
         final Account account = accountUserApi.createAccount(accountData, callContext);
         assertNotNull(account);
 
-        final PaymentMethodPlugin info = new PaymentMethodPlugin() {
-            @Override
-            public boolean isDefaultPaymentMethod() {
-                return false;
-            }
-
-            @Override
-            public String getValueString(final String key) {
-                return null;
-            }
-
-            @Override
-            public List<PaymentMethodKVInfo> getProperties() {
-                return null;
-            }
-
-            @Override
-            public String getExternalPaymentMethodId() {
-                return UUID.randomUUID().toString();
-            }
-        };
+        final PaymentMethodPlugin info = createPaymentMethodPlugin();
 
         paymentApi.addPaymentMethod(paymentPluginName, account, true, info, callContext);
         return accountUserApi.getAccountById(account.getId(), callContext);
+    }
+
+    private class TestPaymentMethodPlugin extends TestPaymentMethodPluginBase {
+        @Override
+        public List<PaymentMethodKVInfo> getProperties() {
+            PaymentMethodKVInfo prop = new PaymentMethodKVInfo("whatever", "cool", Boolean.TRUE);
+            List<PaymentMethodKVInfo> res = new ArrayList<PaymentMethodKVInfo>();
+            res.add(prop);
+            return res;
+        }
+    }
+
+    protected PaymentMethodPlugin createPaymentMethodPlugin() {
+        return new TestPaymentMethodPlugin();
     }
 
     protected AccountData getAccountData(final int billingDay) {

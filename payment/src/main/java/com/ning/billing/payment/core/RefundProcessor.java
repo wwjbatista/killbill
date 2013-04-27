@@ -122,7 +122,7 @@ public class RefundProcessor extends ProcessorBase {
                     paymentDao.insertRefund(refundInfo, context);
 
                     final PaymentPluginApi plugin = getPaymentProviderPlugin(payment.getPaymentMethodId(), context);
-                    plugin.processRefund(paymentId, refundAmount, context.toCallContext());
+                    plugin.processRefund(account.getId(), paymentId, refundAmount, account.getCurrency(), context.toCallContext());
 
                     paymentDao.updateRefundStatus(refundInfo.getId(), RefundStatus.PLUGIN_COMPLETED, context);
 
@@ -183,7 +183,7 @@ public class RefundProcessor extends ProcessorBase {
         throw new IllegalArgumentException("Unable to find invoice item for id " + itemId);
     }
 
-    public Refund getRefund(final UUID refundId, final InternalTenantContext context)
+    public Refund getRefund(final UUID refundId, final boolean withPluginInfo /* not yet implemented */ , final InternalTenantContext context)
             throws PaymentApiException {
         RefundModelDao result = paymentDao.getRefund(refundId, context);
         if (result == null) {

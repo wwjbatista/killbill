@@ -67,8 +67,8 @@ public class DefaultPaymentApi implements PaymentApi {
     }
 
     @Override
-    public Payment getPayment(final UUID paymentId, final TenantContext context) throws PaymentApiException {
-        final Payment payment = paymentProcessor.getPayment(paymentId, internalCallContextFactory.createInternalTenantContext(context));
+    public Payment getPayment(final UUID paymentId, final boolean withPluginInfo, final TenantContext context) throws PaymentApiException {
+        final Payment payment = paymentProcessor.getPayment(paymentId, withPluginInfo, internalCallContextFactory.createInternalTenantContext(context));
         if (payment == null) {
             throw new PaymentApiException(ErrorCode.PAYMENT_NO_SUCH_PAYMENT, paymentId);
         }
@@ -87,8 +87,8 @@ public class DefaultPaymentApi implements PaymentApi {
     }
 
     @Override
-    public Refund getRefund(final UUID refundId, final TenantContext context) throws PaymentApiException {
-        return refundProcessor.getRefund(refundId, internalCallContextFactory.createInternalTenantContext(context));
+    public Refund getRefund(final UUID refundId, final boolean withPluginInfo, final TenantContext context) throws PaymentApiException {
+        return refundProcessor.getRefund(refundId, withPluginInfo, internalCallContextFactory.createInternalTenantContext(context));
     }
 
     @Override
@@ -158,9 +158,9 @@ public class DefaultPaymentApi implements PaymentApi {
     }
 
     @Override
-    public PaymentMethod getPaymentMethodById(final UUID paymentMethodId, final boolean withPluginInfo, final TenantContext context)
+    public PaymentMethod getPaymentMethodById(final UUID paymentMethodId, final boolean includedDeleted, final boolean withPluginInfo, final TenantContext context)
             throws PaymentApiException {
-        return methodProcessor.getPaymentMethodById(paymentMethodId, withPluginInfo, internalCallContextFactory.createInternalTenantContext(context));
+        return methodProcessor.getPaymentMethodById(paymentMethodId, includedDeleted, withPluginInfo, internalCallContextFactory.createInternalTenantContext(context));
     }
 
     @Override

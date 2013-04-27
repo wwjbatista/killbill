@@ -90,10 +90,10 @@ public class PaymentMethodProcessor extends ProcessorBase {
                 PaymentPluginApi pluginApi = null;
                 try {
                     pluginApi = pluginRegistry.getServiceForName(paymentPluginServiceName);
-                    // TODO PIERRE Should we really use the plugin instance name here?
-                    // We default to the plugin name when paymentPluginServiceName is null (i.e. for the default plugin name)
-                    final String pluginName = Objects.firstNonNull(paymentPluginServiceName, pluginApi.getName());
-                    pm = new DefaultPaymentMethod(account.getId(), pluginName, paymentMethodProps);
+                    if (pluginApi == null) {
+                        throw new PaymentApiException(ErrorCode.PAYMENT_NO_SUCH_PAYMENT_PLUGIN, paymentPluginServiceName);
+                    }
+                    pm = new DefaultPaymentMethod(account.getId(), paymentPluginServiceName, paymentMethodProps);
                     pluginApi.addPaymentMethod(account.getId(), pm.getId(), paymentMethodProps, setDefault, context.toCallContext());
                     final PaymentMethodModelDao pmModel = new PaymentMethodModelDao(pm.getId(), pm.getCreatedDate(), pm.getUpdatedDate(),
                                                                                     pm.getAccountId(), pm.getPluginName(), pm.isActive());
@@ -122,9 +122,9 @@ public class PaymentMethodProcessor extends ProcessorBase {
         return getPaymentMethodInternal(paymentMethodModels, withPluginInfo, context);
     }
 
-    public PaymentMethod getPaymentMethodById(final UUID paymentMethodId, final boolean withPluginInfo, final InternalTenantContext context)
+    public PaymentMethod getPaymentMethodById(final UUID paymentMethodId, final boolean includedDeleted, final boolean withPluginInfo, final InternalTenantContext context)
             throws PaymentApiException {
-        final PaymentMethodModelDao paymentMethodModel = paymentDao.getPaymentMethod(paymentMethodId, context);
+        final PaymentMethodModelDao paymentMethodModel = includedDeleted ? paymentDao.getPaymentMethodIncludedDeleted(paymentMethodId, context) : paymentDao.getPaymentMethod(paymentMethodId, context);
         if (paymentMethodModel == null) {
             throw new PaymentApiException(ErrorCode.PAYMENT_NO_SUCH_PAYMENT_METHOD, paymentMethodId);
         }
@@ -209,7 +209,7 @@ public class PaymentMethodProcessor extends ProcessorBase {
                         }
                     }
                     final PaymentPluginApi pluginApi = getPluginApi(paymentMethodId, context);
-                    pluginApi.deletePaymentMethod(paymentMethodId, context.toCallContext());
+                    pluginApi.deletePaymentMethod(account.getId(), paymentMethodId, context.toCallContext());
                     paymentDao.deletedPaymentMethod(paymentMethodId, context);
                     return null;
                 } catch (PaymentPluginApiException e) {
@@ -236,7 +236,7 @@ public class PaymentMethodProcessor extends ProcessorBase {
                 try {
                     final PaymentPluginApi pluginApi = getPluginApi(paymentMethodId, context);
 
-                    pluginApi.setDefaultPaymentMethod(paymentMethodId, context.toCallContext());
+                    pluginApi.setDefaultPaymentMethod(account.getId(), paymentMethodId, context.toCallContext());
                     accountInternalApi.updatePaymentMethod(account.getId(), paymentMethodId, context);
                     return null;
                 } catch (PaymentPluginApiException e) {
@@ -314,7 +314,7 @@ public class PaymentMethodProcessor extends ProcessorBase {
                                                                                                              finalPaymentMethods,
                                                                                                              context);
                 try {
-                    pluginApi.resetPaymentMethods(pluginPmsWithId);
+                    pluginApi.resetPaymentMethods(account.getId(), pluginPmsWithId);
                 } catch (PaymentPluginApiException e) {
                     throw new PaymentApiException(ErrorCode.PAYMENT_REFRESH_PAYMENT_METHOD, account.getId(), e.getErrorMessage());
                 }

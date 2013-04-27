@@ -20,7 +20,7 @@
     <parent>
         <groupId>com.ning.billing</groupId>
         <artifactId>killbill</artifactId>
-        <version>0.1.61-SNAPSHOT</version>
+        <version>0.1.70-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>killbill-beatrix</artifactId>
@@ -53,23 +53,11 @@
         </dependency>
         <dependency>
             <groupId>com.ning.billing</groupId>
-            <artifactId>killbill-osgi</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.ning.billing</groupId>
             <artifactId>killbill-tenant</artifactId>
         </dependency>
         <dependency>
             <groupId>com.ning.billing</groupId>
             <artifactId>killbill-usage</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.ning.billing</groupId>
-            <artifactId>killbill-osgi-bundles-test-beatrix</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.ning.billing</groupId>
-            <artifactId>killbill-osgi-bundles-test-payment</artifactId>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
@@ -101,6 +89,35 @@
             <artifactId>jdbi</artifactId>
         </dependency>
         <!-- TEST SCOPE -->
+
+        <dependency>
+            <groupId>com.ning.billing</groupId>
+            <artifactId>killbill-osgi</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ning.billing</groupId>
+            <artifactId>killbill-osgi-bundles-test-beatrix</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ning.billing</groupId>
+            <artifactId>killbill-osgi-bundles-test-payment</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.ning.billing</groupId>
+            <artifactId>killbill-osgi-bundles-jruby</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.5</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
@@ -195,6 +212,7 @@
                             <tasks>
                                 <copy file="${basedir}/../osgi-bundles/tests/beatrix/target/killbill-osgi-bundles-test-beatrix-${project.version}-jar-with-dependencies.jar" tofile="${basedir}/src/test/resources/killbill-osgi-bundles-test-beatrix-${project.version}-jar-with-dependencies.jar" />
                                 <copy file="${basedir}/../osgi-bundles/tests/payment/target/killbill-osgi-bundles-test-payment-${project.version}-jar-with-dependencies.jar" tofile="${basedir}/src/test/resources/killbill-osgi-bundles-test-payment-${project.version}-jar-with-dependencies.jar" />
+                                <copy file="${basedir}/../osgi-bundles/bundles/jruby/target/killbill-osgi-bundles-jruby-${project.version}.jar" tofile="${basedir}/src/test/resources/killbill-osgi-bundles-jruby-${project.version}.jar" />
                             </tasks>
                         </configuration>
                         <goals>

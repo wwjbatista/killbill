@@ -20,7 +20,7 @@
     <parent>
         <groupId>com.ning.billing</groupId>
         <artifactId>killbill-osgi-test-bundles</artifactId>
-        <version>0.1.61-SNAPSHOT</version>
+        <version>0.1.70-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>killbill-osgi-bundles-test-beatrix</artifactId>
@@ -79,6 +79,27 @@
                             <sources>
                                 <source>src/test/java</source>
                             </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>jar</goal>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <!-- use the manifest file created by the bundle plugin -->
+                                <!--<useDefaultManifestFile>true</useDefaultManifestFile>-->
+                                <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+                                <!-- bundle plugin already generated the maven descriptor -->
+                                <addMavenDescriptor>false</addMavenDescriptor>
+                            </archive>
                         </configuration>
                     </execution>
                 </executions>

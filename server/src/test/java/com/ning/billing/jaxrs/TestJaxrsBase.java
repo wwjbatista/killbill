@@ -30,13 +30,13 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.joda.time.LocalDate;
 import org.skife.config.ConfigSource;
 import org.skife.config.ConfigurationObjectFactory;
-import org.skife.config.SimplePropertyConfigSource;
 import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 
 import com.ning.billing.GuicyKillbillTestWithEmbeddedDBModule;
+import com.ning.billing.KillbillConfigSource;
 import com.ning.billing.account.glue.DefaultAccountModule;
 import com.ning.billing.analytics.setup.AnalyticsModule;
 import com.ning.billing.api.TestApiListener;
@@ -70,6 +70,7 @@ import com.ning.billing.util.glue.CustomFieldModule;
 import com.ning.billing.util.glue.ExportModule;
 import com.ning.billing.util.glue.NonEntityDaoModule;
 import com.ning.billing.util.glue.NotificationQueueModule;
+import com.ning.billing.util.glue.RecordIdModule;
 import com.ning.billing.util.glue.TagStoreModule;
 import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
@@ -170,7 +171,7 @@ public class TestJaxrsBase extends KillbillClient {
 
         @Override
         protected void installKillbillModules() {
-            final ConfigSource configSource = new SimplePropertyConfigSource(System.getProperties());
+            final KillbillConfigSource configSource = new KillbillConfigSource(System.getProperties());
 
             /*
              * For a lack of getting module override working, copy all install modules from parent class...
@@ -178,6 +179,10 @@ public class TestJaxrsBase extends KillbillClient {
             super.installKillbillModules();
             Modules.override(new com.ning.billing.payment.setup.PaymentModule()).with(new PaymentMockModule());
             */
+
+            configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "url", helper.getJdbcConnectionString());
+            configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "user", DBTestingHelper.USERNAME);
+            configSource.setProperty(AnalyticsModule.ANALYTICS_DBI_CONFIG_STRING + "password", DBTestingHelper.PASSWORD);
 
             install(new GuicyKillbillTestWithEmbeddedDBModule());
 
@@ -206,6 +211,7 @@ public class TestJaxrsBase extends KillbillClient {
             install(new ExportModule());
             install(new DefaultOSGIModule(configSource));
             install(new UsageModule(configSource));
+            install(new RecordIdModule());
             installClock();
         }
     }
@@ -214,7 +220,7 @@ public class TestJaxrsBase extends KillbillClient {
     public void beforeMethod() throws Exception {
         super.beforeMethod();
         busHandler.reset();
-        clock.reset();
+        clock.resetDeltaFromReality();
         clock.setDay(new LocalDate(2012, 8, 25));
     }
 

@@ -17,11 +17,13 @@
 package com.ning.billing.osgi.bundles.test;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import org.joda.time.DateTime;
 
+import com.ning.billing.catalog.api.Currency;
 import com.ning.billing.payment.api.PaymentMethodPlugin;
 import com.ning.billing.payment.plugin.api.PaymentInfoPlugin;
 import com.ning.billing.payment.plugin.api.PaymentMethodInfoPlugin;
@@ -44,12 +46,7 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
     }
 
     @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public PaymentInfoPlugin processPayment(final UUID kbPaymentId, final UUID kbPaymentMethodId, final BigDecimal amount, final CallContext context) throws PaymentPluginApiException {
+    public PaymentInfoPlugin processPayment(final UUID accountId, final UUID kbPaymentId, final UUID kbPaymentMethodId, final BigDecimal amount, final Currency currency, final CallContext context) throws PaymentPluginApiException {
         return withRuntimeCheckForExceptions(new PaymentInfoPlugin() {
             @Override
             public BigDecimal getAmount() {
@@ -75,11 +72,21 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
             public String getGatewayErrorCode() {
                 return null;
             }
+
+            @Override
+            public String getFirstPaymentReferenceId() {
+                return null;
+            }
+
+            @Override
+            public String getSecondPaymentReferenceId() {
+                return null;
+            }
         });
     }
 
     @Override
-    public PaymentInfoPlugin getPaymentInfo(final UUID kbPaymentId, final TenantContext context) throws PaymentPluginApiException {
+    public PaymentInfoPlugin getPaymentInfo(final UUID accountId, final UUID kbPaymentId, final TenantContext context) throws PaymentPluginApiException {
 
         final BigDecimal someAmount = new BigDecimal("12.45");
         return withRuntimeCheckForExceptions(new PaymentInfoPlugin() {
@@ -107,11 +114,21 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
             public String getGatewayErrorCode() {
                 return null;
             }
+
+            @Override
+            public String getFirstPaymentReferenceId() {
+                return null;
+            }
+
+            @Override
+            public String getSecondPaymentReferenceId() {
+                return null;
+            }
         });
     }
 
     @Override
-    public RefundInfoPlugin processRefund(final UUID kbPaymentId, final BigDecimal refundAmount, final CallContext context) throws PaymentPluginApiException {
+    public RefundInfoPlugin processRefund(final UUID accountId, final UUID kbPaymentId, final BigDecimal refundAmount, final Currency currency, final CallContext context) throws PaymentPluginApiException {
 
         final BigDecimal someAmount = new BigDecimal("12.45");
         return withRuntimeCheckForExceptions(new RefundInfoPlugin() {
@@ -139,7 +156,17 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
             public String getGatewayErrorCode() {
                 return null;
             }
+
+            @Override
+            public String getReferenceId() {
+                return null;
+            }
         });
+    }
+
+    @Override
+    public List<RefundInfoPlugin> getRefundInfo(final UUID kbAccountId, final UUID kbPaymentId, final TenantContext context) {
+        return Collections.<RefundInfoPlugin>emptyList();
     }
 
     @Override
@@ -147,7 +174,7 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
     }
 
     @Override
-    public void deletePaymentMethod(final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
+    public void deletePaymentMethod(final UUID accountId, final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
     }
 
     @Override
@@ -156,7 +183,7 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
     }
 
     @Override
-    public void setDefaultPaymentMethod(final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
+    public void setDefaultPaymentMethod(final UUID accountId, final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
     }
 
     @Override
@@ -165,7 +192,7 @@ public class TestPaymentPluginApi implements PaymentPluginApiWithTestControl {
     }
 
     @Override
-    public void resetPaymentMethods(final List<PaymentMethodInfoPlugin> paymentMethods) throws PaymentPluginApiException {
+    public void resetPaymentMethods(final UUID accountId, final List<PaymentMethodInfoPlugin> paymentMethods) throws PaymentPluginApiException {
     }
 
 

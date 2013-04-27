@@ -20,13 +20,14 @@
     <parent>
         <groupId>com.ning.billing</groupId>
         <artifactId>killbill-osgi-all-bundles</artifactId>
-        <version>0.1.61-SNAPSHOT</version>
+        <version>0.1.70-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>killbill-osgi-bundles</artifactId>
     <name>Killbill billing platform: OSGI bundles</name>
     <packaging>pom</packaging>
     <modules>
+        <module>analytics</module>
         <module>jruby</module>
         <module>logger</module>
         <module>meter</module>

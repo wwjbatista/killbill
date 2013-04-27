@@ -17,13 +17,15 @@
 package com.ning.billing.payment.provider;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.ning.billing.payment.api.DefaultPaymentMethodPlugin;
+import com.ning.billing.catalog.api.Currency;
+import com.ning.billing.payment.api.TestPaymentMethodPlugin;
 import com.ning.billing.payment.api.PaymentMethodPlugin;
 import com.ning.billing.payment.plugin.api.NoOpPaymentPluginApi;
 import com.ning.billing.payment.plugin.api.PaymentInfoPlugin;
@@ -90,12 +92,7 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     }
 
     @Override
-    public String getName() {
-        return PLUGIN_NAME;
-    }
-
-    @Override
-    public PaymentInfoPlugin processPayment(final UUID kbPaymentId, final UUID kbPaymentMethodId, final BigDecimal amount, final CallContext context) throws PaymentPluginApiException {
+    public PaymentInfoPlugin processPayment(final UUID kbAccountId, final UUID kbPaymentId, final UUID kbPaymentMethodId, final BigDecimal amount, final Currency currency, final CallContext context) throws PaymentPluginApiException {
         if (makeNextInvoiceFailWithException.getAndSet(false)) {
             throw new PaymentPluginApiException("", "test error");
         }
@@ -107,7 +104,7 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     }
 
     @Override
-    public PaymentInfoPlugin getPaymentInfo(final UUID kbPaymentId, final TenantContext context) throws PaymentPluginApiException {
+    public PaymentInfoPlugin getPaymentInfo(final UUID kbAccountId, final UUID kbPaymentId, final TenantContext context) throws PaymentPluginApiException {
         final PaymentInfoPlugin payment = payments.get(kbPaymentId.toString());
         if (payment == null) {
             throw new PaymentPluginApiException("", "No payment found for payment id " + kbPaymentId.toString());
@@ -119,7 +116,7 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     @Override
     public void addPaymentMethod(final UUID kbAccountId, final UUID kbPaymentMethodId, final PaymentMethodPlugin paymentMethodProps, final boolean setDefault, final CallContext context) throws PaymentPluginApiException {
         // externalPaymentMethodId is set to a random value
-        final PaymentMethodPlugin realWithID = new DefaultPaymentMethodPlugin(paymentMethodProps, UUID.randomUUID().toString());
+        final PaymentMethodPlugin realWithID = new TestPaymentMethodPlugin(paymentMethodProps, UUID.randomUUID().toString());
         paymentMethods.put(kbPaymentMethodId.toString(), realWithID);
 
         final PaymentMethodInfoPlugin realInfoWithID = new DefaultPaymentMethodInfoPlugin(kbAccountId, kbPaymentMethodId, setDefault, UUID.randomUUID().toString());
@@ -127,7 +124,7 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     }
 
     @Override
-    public void deletePaymentMethod(final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
+    public void deletePaymentMethod(final UUID kbAccountId, final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
         paymentMethods.remove(kbPaymentMethodId.toString());
         paymentMethodsInfo.remove(kbPaymentMethodId.toString());
     }
@@ -138,7 +135,7 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     }
 
     @Override
-    public void setDefaultPaymentMethod(final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
+    public void setDefaultPaymentMethod(final UUID kbAccountId, final UUID kbPaymentMethodId, final CallContext context) throws PaymentPluginApiException {
     }
 
     @Override
@@ -147,7 +144,7 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     }
 
     @Override
-    public void resetPaymentMethods(final List<PaymentMethodInfoPlugin> input) {
+    public void resetPaymentMethods(final UUID kbAccountId, final List<PaymentMethodInfoPlugin> input) {
         paymentMethodsInfo.clear();
         if (input != null) {
             for (final PaymentMethodInfoPlugin cur : input) {
@@ -157,10 +154,10 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
     }
 
     @Override
-    public RefundInfoPlugin processRefund(final UUID kbPaymentId, final BigDecimal refundAmount, final CallContext context) throws PaymentPluginApiException {
-        final PaymentInfoPlugin paymentInfoPlugin = getPaymentInfo(kbPaymentId, context);
+    public RefundInfoPlugin processRefund(final UUID kbAccountId, final UUID kbPaymentId, final BigDecimal refundAmount, final Currency currency, final CallContext context) throws PaymentPluginApiException {
+        final PaymentInfoPlugin paymentInfoPlugin = getPaymentInfo(kbAccountId, kbPaymentId, context);
         if (paymentInfoPlugin == null) {
-            throw new PaymentPluginApiException("", String.format("No payment found for payment id %s (plugin %s)", kbPaymentId.toString(), getName()));
+            throw new PaymentPluginApiException("", String.format("No payment found for payment id %s (plugin %s)", kbPaymentId.toString(), PLUGIN_NAME));
         }
 
         BigDecimal maxAmountRefundable = paymentInfoPlugin.getAmount();
@@ -169,12 +166,17 @@ public class MockPaymentProviderPlugin implements NoOpPaymentPluginApi {
         }
         if (maxAmountRefundable.compareTo(refundAmount) < 0) {
             throw new PaymentPluginApiException("", String.format("Refund amount of %s for payment id %s is bigger than the payment amount %s (plugin %s)",
-                                                                  refundAmount, kbPaymentId.toString(), paymentInfoPlugin.getAmount(), getName()));
+                                                                  refundAmount, kbPaymentId.toString(), paymentInfoPlugin.getAmount(), PLUGIN_NAME));
         }
 
         final DefaultNoOpRefundInfoPlugin refundInfoPlugin = new DefaultNoOpRefundInfoPlugin(refundAmount, clock.getUTCNow(), clock.getUTCNow(), RefundPluginStatus.PROCESSED, null);
         refunds.put(kbPaymentId.toString(), refundInfoPlugin);
 
         return refundInfoPlugin;
+    }
+
+    @Override
+    public List<RefundInfoPlugin> getRefundInfo(final UUID kbAccountId, final UUID kbPaymentId, final TenantContext context) throws PaymentPluginApiException {
+        return Collections.<RefundInfoPlugin>emptyList();
     }
 }

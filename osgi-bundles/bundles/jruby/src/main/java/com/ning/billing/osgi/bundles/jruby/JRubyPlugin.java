@@ -43,7 +43,7 @@ public abstract class JRubyPlugin {
 
     // Magic ruby variables
     private static final String KILLBILL_SERVICES = "java_apis";
-    private static final String ACTIVE = "@active";
+    private static final String KILLBILL_PLUGIN_CLASS_NAME = "plugin_class_name";
 
     protected final LogService logger;
     protected final BundleContext bundleContext;
@@ -87,12 +87,13 @@ public abstract class JRubyPlugin {
 
         // Register all killbill APIs
         container.put(KILLBILL_SERVICES, killbillApis);
+        container.put(KILLBILL_PLUGIN_CLASS_NAME, pluginMainClass);
 
         // Note that the KILLBILL_SERVICES variable will be available once only!
         // Don't put any code here!
 
         // Start the plugin
-        pluginInstance = (RubyObject) container.runScriptlet(pluginMainClass + ".new(" + KILLBILL_SERVICES + ")");
+        pluginInstance = (RubyObject) container.runScriptlet("Killbill::Plugin::JPayment.new(" + KILLBILL_PLUGIN_CLASS_NAME + "," + KILLBILL_SERVICES + ")");
     }
 
     public void startPlugin(final BundleContext context) {
@@ -129,13 +130,13 @@ public abstract class JRubyPlugin {
     }
 
     protected void checkPluginIsRunning() {
-        if (pluginInstance == null || !pluginInstance.getInstanceVariable(ACTIVE).isTrue()) {
+        if (pluginInstance == null || ! (Boolean) pluginInstance.callMethod("is_active").toJava(Boolean.class)) {
             throw new IllegalStateException(String.format("Plugin %s didn't start properly", pluginMainClass));
         }
     }
 
     protected void checkPluginIsStopped() {
-        if (pluginInstance == null || pluginInstance.getInstanceVariable(ACTIVE).isTrue()) {
+        if (pluginInstance == null || (Boolean) pluginInstance.callMethod("is_active").toJava(Boolean.class)) {
             throw new IllegalStateException(String.format("Plugin %s didn't stop properly", pluginMainClass));
         }
     }
@@ -194,7 +195,8 @@ public abstract class JRubyPlugin {
             builder.append("begin\n")
                    .append("require '").append(pluginGemName).append("'\n")
                    .append("rescue LoadError\n")
-                   .append("warn \"WARN: unable to require ").append(pluginGemName).append("\"\n")
+                   // Could be useful for debugging
+                   //.append("warn \"WARN: unable to require ").append(pluginGemName).append("\"\n")
                    .append("end\n");
             // Load the extra require file, if specified
             if (rubyRequire != null) {

@@ -20,7 +20,7 @@
     <parent>
         <groupId>com.ning.billing</groupId>
         <artifactId>killbill-osgi-bundles</artifactId>
-        <version>0.1.61-SNAPSHOT</version>
+        <version>0.1.70-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>killbill-osgi-bundles-jruby</artifactId>
@@ -74,6 +74,27 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>jar</goal>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <archive>
+                                <!-- use the manifest file created by the bundle plugin -->
+                                <!--<useDefaultManifestFile>true</useDefaultManifestFile>-->
+                                <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
+                                <!-- bundle plugin already generated the maven descriptor -->
+                                <addMavenDescriptor>false</addMavenDescriptor>
+                            </archive>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
                 <extensions>true</extensions>
@@ -83,7 +104,7 @@
                         <Export-Package />
                         <Private-Package>com.ning.billing.osgi.bundles.jruby.*</Private-Package>
                         <!-- Optional resolution because exported by the Felix system bundle -->
-                        <Import-Package>*;resolution:=optional,com.ning.billing.osgi.api,javax.management;javax.management.*;javax.crypto;javax.crypto.*;javax.net;javax.net.*;javax.net.ssl;javax.net.ssl.*;javax.security;javax.security.*;javax.security.cert;javax.security.cert.*;javax.security.auth;javax.security.auth.*;javax.security.auth.x500;javax.security.auth.x500.*;resolution:=optional</Import-Package>
+                        <Import-Package>*;resolution:=optional,org.joda.time;org.joda.time.format;resolution:=optional,com.ning.billing.osgi.api,javax.management;javax.management.*;javax.crypto;javax.crypto.*;javax.net;javax.net.*;javax.net.ssl;javax.net.ssl.*;javax.security;javax.security.*;javax.security.cert;javax.security.cert.*;javax.security.auth;javax.security.auth.*;javax.security.auth.x500;javax.security.auth.x500.*;resolution:=optional</Import-Package>
                     </instructions>
                 </configuration>
                 <executions>
@@ -107,7 +128,7 @@
                         <phase>package</phase>
                         <configuration>
                             <createSourcesJar>true</createSourcesJar>
-                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
                             <shadedClassifierName>jar-with-dependencies</shadedClassifierName>
                             <filters>
                                 <filter>

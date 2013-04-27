@@ -18,6 +18,7 @@ package com.ning.billing.beatrix.extbus.dao;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.Date;
 import java.util.UUID;
 
@@ -84,7 +85,7 @@ public interface ExtBusSqlDao extends Transactional<ExtBusSqlDao>, CloseMe {
         @Override
         public void bind(@SuppressWarnings("rawtypes") final SQLStatement stmt, final Bind bind, final ExtBusEventEntry evt) {
             stmt.bind("eventType", evt.getExtBusType().toString());
-            stmt.bind("objectId", evt.getObjectId().toString());
+            bindWithPotentialNullStringValue(stmt, "objectId", evt.getObjectId());
             stmt.bind("objectType", evt.getObjectType().toString());
             stmt.bind("userToken", getUUIDString(evt.getUserToken()));
             stmt.bind("createdDate", getDate(new DateTime()));
@@ -92,6 +93,14 @@ public interface ExtBusSqlDao extends Transactional<ExtBusSqlDao>, CloseMe {
             stmt.bind("processingAvailableDate", getDate(evt.getNextAvailableDate()));
             stmt.bind("processingOwner", evt.getOwner());
             stmt.bind("processingState", PersistentQueueEntryLifecycleState.AVAILABLE.toString());
+        }
+
+        private void bindWithPotentialNullStringValue(final SQLStatement stmt, final String bindType, final Object bindValue) {
+            if (bindValue == null) {
+                stmt.bindNull(bindType, Types.VARCHAR);
+            } else {
+                stmt.bind(bindType, bindValue.toString());
+            }
         }
     }
 

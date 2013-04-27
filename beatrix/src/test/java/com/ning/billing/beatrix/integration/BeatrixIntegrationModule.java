@@ -44,6 +44,8 @@ import com.ning.billing.catalog.glue.CatalogModule;
 import com.ning.billing.entitlement.api.EntitlementService;
 import com.ning.billing.entitlement.glue.DefaultEntitlementModule;
 import com.ning.billing.invoice.api.InvoiceService;
+import com.ning.billing.invoice.generator.DefaultInvoiceGeneratorWithSwitchRepairLogic;
+import com.ning.billing.invoice.generator.InvoiceGenerator;
 import com.ning.billing.invoice.glue.DefaultInvoiceModule;
 import com.ning.billing.junction.glue.DefaultJunctionModule;
 import com.ning.billing.lifecycle.KillbillService;
@@ -67,6 +69,7 @@ import com.ning.billing.util.glue.ExportModule;
 import com.ning.billing.util.glue.GlobalLockerModule;
 import com.ning.billing.util.glue.NonEntityDaoModule;
 import com.ning.billing.util.glue.NotificationQueueModule;
+import com.ning.billing.util.glue.RecordIdModule;
 import com.ning.billing.util.glue.TagStoreModule;
 import com.ning.billing.util.svcsapi.bus.BusService;
 
@@ -82,7 +85,7 @@ public class BeatrixIntegrationModule extends AbstractModule {
     public static final String NON_OSGI_PLUGIN_NAME = "yoyo";
 
     // Same name the osgi-payment-test plugin uses to register its service
-    public static final String OSGI_PLUGIN_NAME = "osgiPaymentPlugin";
+    public static final String OSGI_PLUGIN_NAME = "osgi-payment-plugin";
 
     private final ConfigSource configSource;
 
@@ -90,10 +93,11 @@ public class BeatrixIntegrationModule extends AbstractModule {
         this.configSource = configSource;
     }
 
+
     @Override
     protected void configure() {
 
-        loadSystemPropertiesFromClasspath("/resource.properties");
+        loadSystemPropertiesFromClasspath("/beatrix.properties");
 
         bind(Lifecycle.class).to(SubsetDefaultLifecycle.class).asEagerSingleton();
 
@@ -111,7 +115,7 @@ public class BeatrixIntegrationModule extends AbstractModule {
         install(new AnalyticsModule(configSource));
         install(new CatalogModule(configSource));
         install(new DefaultEntitlementModule(configSource));
-        install(new DefaultInvoiceModule(configSource));
+        install(new DefaultInvoiceModuleWithSwitchRepairLogic(configSource));
         install(new TemplateModule());
         install(new PaymentPluginMockModule(configSource));
         install(new DefaultJunctionModule(configSource));
@@ -122,6 +126,7 @@ public class BeatrixIntegrationModule extends AbstractModule {
         install(new ExportModule());
         install(new DefaultOSGIModule(configSource));
         install(new NonEntityDaoModule());
+        install(new RecordIdModule());
 
         bind(AccountChecker.class).asEagerSingleton();
         bind(EntitlementChecker.class).asEagerSingleton();
@@ -138,6 +143,19 @@ public class BeatrixIntegrationModule extends AbstractModule {
         bind(BeatrixListener.class).asEagerSingleton();
         bind(DefaultBeatrixService.class).asEagerSingleton();
     }
+
+    private static final class DefaultInvoiceModuleWithSwitchRepairLogic extends DefaultInvoiceModule {
+
+        public DefaultInvoiceModuleWithSwitchRepairLogic(final ConfigSource configSource) {
+            super(configSource);
+        }
+
+        protected void installInvoiceGenerator() {
+            bind(InvoiceGenerator.class).to(DefaultInvoiceGeneratorWithSwitchRepairLogic.class).asEagerSingleton();
+            bind(DefaultInvoiceGeneratorWithSwitchRepairLogic.class).asEagerSingleton();
+        }
+    }
+
 
     private static final class PaymentPluginMockModule extends PaymentModule {
 
