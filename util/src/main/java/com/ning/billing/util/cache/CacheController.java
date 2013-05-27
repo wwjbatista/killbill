@@ -16,18 +16,13 @@
 
 package com.ning.billing.util.cache;
 
-import java.util.Collection;
-
-import com.ning.billing.ObjectType;
-import com.ning.billing.util.cache.Cachable.CacheType;
-
 public interface CacheController<K, V> {
 
-    public CacheType getType();
-
-    public V get(K key, ObjectType objectType);
+    public V get(K key, CacheLoaderArgument objectType);
 
     public boolean remove(K key);
 
     public int size();
+
+    void removeAll();
 }

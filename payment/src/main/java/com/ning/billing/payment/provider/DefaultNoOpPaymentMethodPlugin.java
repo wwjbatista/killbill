@@ -19,6 +19,7 @@ package com.ning.billing.payment.provider;
 import java.util.List;
 import java.util.UUID;
 
+import com.ning.billing.payment.api.PaymentMethodKVInfo;
 import com.ning.billing.payment.api.PaymentMethodPlugin;
 
 public class DefaultNoOpPaymentMethodPlugin implements PaymentMethodPlugin {
@@ -90,12 +91,12 @@ public class DefaultNoOpPaymentMethodPlugin implements PaymentMethodPlugin {
     }
 
     @Override
-    public String getCCExprirationMonth() {
+    public String getCCExpirationMonth() {
         return null;
     }
 
     @Override
-    public String getCCExprirationYear() {
+    public String getCCExpirationYear() {
         return null;
     }
 

@@ -27,7 +27,7 @@ import org.joda.time.LocalDate;
 import com.ning.billing.account.api.Account;
 import com.ning.billing.invoice.api.Invoice;
 import com.ning.billing.invoice.api.InvoicePayment;
-import com.ning.billing.invoice.api.InvoicePayment.InvoicePaymentType;
+import com.ning.billing.invoice.api.InvoicePaymentType;
 import com.ning.billing.payment.api.Payment;
 import com.ning.billing.payment.api.PaymentMethod;
 import com.ning.billing.payment.api.Refund;
@@ -295,8 +295,8 @@ public abstract class BusinessInvoicePaymentBaseModelDao extends BusinessModelDa
              paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getType() : null) : null,
              paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCName() : null) : null,
              paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCType() : null) : null,
-             paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCExprirationMonth() : null) : null,
-             paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCExprirationYear() : null) : null,
+             paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCExpirationMonth() : null) : null,
+             paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCExpirationYear() : null) : null,
              paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getCCLast4() : null) : null,
              paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getAddress1() : null) : null,
              paymentMethod != null ? (paymentMethod.getPluginDetail() != null ? paymentMethod.getPluginDetail().getAddress2() : null) : null,

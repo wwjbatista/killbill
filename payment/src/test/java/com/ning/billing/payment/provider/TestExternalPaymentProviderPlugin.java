@@ -19,7 +19,6 @@ package com.ning.billing.payment.provider;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import org.joda.time.Seconds;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -29,7 +28,7 @@ import com.ning.billing.account.api.Account;
 import com.ning.billing.catalog.api.Currency;
 import com.ning.billing.payment.PaymentTestSuiteNoDB;
 import com.ning.billing.payment.plugin.api.PaymentInfoPlugin;
-import com.ning.billing.payment.plugin.api.PaymentInfoPlugin.PaymentPluginStatus;
+import com.ning.billing.payment.plugin.api.PaymentPluginStatus;
 import com.ning.billing.payment.plugin.api.PaymentPluginApiException;
 import com.ning.billing.util.clock.Clock;
 import com.ning.billing.util.clock.ClockMock;
@@ -57,8 +56,6 @@ public class TestExternalPaymentProviderPlugin extends PaymentTestSuiteNoDB {
         final PaymentInfoPlugin paymentInfoPlugin = plugin.processPayment(accountId, paymentId, paymentMethodId, amount, Currency.BRL, callContext);
 
         Assert.assertEquals(paymentInfoPlugin.getAmount(), amount);
-        Assert.assertEquals(Seconds.secondsBetween(paymentInfoPlugin.getCreatedDate(), clock.getUTCNow()).getSeconds(), 0);
-        Assert.assertEquals(Seconds.secondsBetween(paymentInfoPlugin.getEffectiveDate(), clock.getUTCNow()).getSeconds(), 0);
         Assert.assertNull(paymentInfoPlugin.getGatewayError());
         Assert.assertNull(paymentInfoPlugin.getGatewayErrorCode());
         Assert.assertEquals(paymentInfoPlugin.getStatus(), PaymentPluginStatus.PROCESSED);

@@ -24,7 +24,6 @@ import com.ning.billing.catalog.api.Plan;
 import com.ning.billing.catalog.api.PlanPhase;
 import com.ning.billing.catalog.api.PriceList;
 import com.ning.billing.entitlement.api.SubscriptionTransitionType;
-import com.ning.billing.entitlement.api.user.Subscription.SubscriptionState;
 import com.ning.billing.entitlement.events.EntitlementEvent.EventType;
 import com.ning.billing.entitlement.events.user.ApiEventType;
 import com.ning.billing.entitlement.exceptions.EntitlementError;
@@ -102,12 +101,17 @@ public class SubscriptionTransitionData implements SubscriptionTransition {
     }
 
     public SubscriptionTransitionData(final SubscriptionTransitionData input, int remainingEventsForUserOperation) {
+       this(input, input.getEventType(), input.getApiEventType(), remainingEventsForUserOperation);
+    }
+
+    public SubscriptionTransitionData(final SubscriptionTransitionData input, final EventType eventType,
+                                      final ApiEventType apiEventType, int remainingEventsForUserOperation) {
         super();
         this.eventId = input.getId();
         this.subscriptionId = input.getSubscriptionId();
         this.bundleId = input.getBundleId();
-        this.eventType = input.getEventType();
-        this.apiEventType = input.getApiEventType();
+        this.eventType = eventType;
+        this.apiEventType = apiEventType;
         this.requestedTransitionTime = input.getRequestedTransitionTime();
         this.effectiveTransitionTime = input.getEffectiveTransitionTime();
         this.previousEventId = input.getPreviousEventId();

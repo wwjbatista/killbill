@@ -13,6 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
+
 package com.ning.billing.beatrix.bus.api;
 
 /**
@@ -23,8 +24,10 @@ public enum ExtBusEventType {
     ACCOUNT_CREATION,
     ACCOUNT_CHANGE,
     SUBSCRIPTION_CREATION,
+    SUBSCRIPTION_PHASE,
     SUBSCRIPTION_CHANGE,
     SUBSCRIPTION_CANCEL,
+    SUBSCRIPTION_UNCANCEL,
     OVERDUE_CHANGE,
     INVOICE_CREATION,
     INVOICE_ADJUSTMENT,
@@ -33,5 +36,5 @@ public enum ExtBusEventType {
     TAG_CREATION,
     TAG_DELETION,
     CUSTOM_FIELD_CREATION,
-    CUSTOM_FIELD_DELETION
+    CUSTOM_FIELD_DELETION;
 }

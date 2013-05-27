@@ -18,6 +18,7 @@ package com.ning.billing.osgi.bundles.analytics;
 
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -27,6 +28,7 @@ import com.ning.billing.beatrix.bus.api.ExtBusEvent;
 import com.ning.billing.commons.locker.GlobalLock;
 import com.ning.billing.commons.locker.GlobalLocker;
 import com.ning.billing.commons.locker.mysql.MySqlGlobalLocker;
+import com.ning.billing.osgi.bundles.analytics.dao.AllBusinessObjectsDao;
 import com.ning.billing.osgi.bundles.analytics.dao.BusinessAccountDao;
 import com.ning.billing.osgi.bundles.analytics.dao.BusinessFieldDao;
 import com.ning.billing.osgi.bundles.analytics.dao.BusinessInvoiceAndInvoicePaymentDao;
@@ -53,20 +55,24 @@ public class AnalyticsListener implements OSGIKillbillEventHandler {
     private final BusinessOverdueStatusDao bosDao;
     private final BusinessFieldDao bFieldDao;
     private final BusinessTagDao bTagDao;
+    private final AllBusinessObjectsDao allBusinessObjectsDao;
     private final GlobalLocker locker;
 
     public AnalyticsListener(final OSGIKillbillLogService logService,
                              final OSGIKillbillAPI osgiKillbillAPI,
-                             final OSGIKillbillDataSource osgiKillbillDataSource) {
+                             final OSGIKillbillDataSource osgiKillbillDataSource,
+                             final Executor executor) {
         this.logService = logService;
 
-        this.bacDao = new BusinessAccountDao(logService, osgiKillbillAPI, osgiKillbillDataSource);
-        this.bstDao = new BusinessSubscriptionTransitionDao(logService, osgiKillbillAPI, osgiKillbillDataSource, bacDao);
-        this.binAndBipDao = new BusinessInvoiceAndInvoicePaymentDao(logService, osgiKillbillAPI, osgiKillbillDataSource, bacDao);
-        this.bosDao = new BusinessOverdueStatusDao(logService, osgiKillbillAPI, osgiKillbillDataSource);
+        this.bacDao = new BusinessAccountDao(logService, osgiKillbillAPI, osgiKillbillDataSource, executor);
+        this.bstDao = new BusinessSubscriptionTransitionDao(logService, osgiKillbillAPI, osgiKillbillDataSource, bacDao, executor);
+        this.binAndBipDao = new BusinessInvoiceAndInvoicePaymentDao(logService, osgiKillbillAPI, osgiKillbillDataSource, bacDao, executor);
+        this.bosDao = new BusinessOverdueStatusDao(logService, osgiKillbillAPI, osgiKillbillDataSource, executor);
         this.bFieldDao = new BusinessFieldDao(logService, osgiKillbillAPI, osgiKillbillDataSource);
         this.bTagDao = new BusinessTagDao(logService, osgiKillbillAPI, osgiKillbillDataSource);
+        this.allBusinessObjectsDao = new AllBusinessObjectsDao(logService, osgiKillbillAPI, osgiKillbillDataSource, executor);
 
+        // TODO Do we still need it?
         this.locker = new MySqlGlobalLocker(osgiKillbillDataSource.getDataSource());
     }
 
@@ -77,11 +83,15 @@ public class AnalyticsListener implements OSGIKillbillEventHandler {
         switch (killbillEvent.getEventType()) {
             case ACCOUNT_CREATION:
             case ACCOUNT_CHANGE:
-                handleAccountEvent(killbillEvent, callContext);
+                // Note: account information is denormalized across all tables, we pretty much
+                // have to refresh all objects
+                handleFullRefreshEvent(killbillEvent, callContext);
                 break;
             case SUBSCRIPTION_CREATION:
             case SUBSCRIPTION_CHANGE:
             case SUBSCRIPTION_CANCEL:
+            case SUBSCRIPTION_PHASE:
+            case SUBSCRIPTION_UNCANCEL:
                 handleSubscriptionEvent(killbillEvent, callContext);
                 break;
             case OVERDUE_CHANGE:
@@ -97,7 +107,9 @@ public class AnalyticsListener implements OSGIKillbillEventHandler {
                 break;
             case TAG_CREATION:
             case TAG_DELETION:
-                handleTagEvent(killbillEvent, callContext);
+                // Note: tags determine the report group. Since it is denormalized across all tables, we pretty much
+                // have to refresh all objects
+                handleFullRefreshEvent(killbillEvent, callContext);
                 break;
             case CUSTOM_FIELD_CREATION:
             case CUSTOM_FIELD_DELETION:
@@ -173,6 +185,16 @@ public class AnalyticsListener implements OSGIKillbillEventHandler {
             @Override
             public Void call() throws Exception {
                 bFieldDao.update(killbillEvent.getAccountId(), callContext);
+                return null;
+            }
+        });
+    }
+
+    private void handleFullRefreshEvent(final ExtBusEvent killbillEvent, final CallContext callContext) {
+        updateWithAccountLock(killbillEvent, new Callable<Void>() {
+            @Override
+            public Void call() throws Exception {
+                allBusinessObjectsDao.update(killbillEvent.getAccountId(), callContext);
                 return null;
             }
         });

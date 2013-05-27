@@ -13,6 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
+
 package com.ning.billing.payment.api;
 
 // STEPH is that the enum we want to export? seems to internal
@@ -32,5 +33,5 @@ public enum PaymentStatus {
     /* Exception from plugin, we already retried a maximum of time */
     PLUGIN_FAILURE_ABORTED,
     /* Payment Subsystem is off */
-    PAYMENT_SYSTEM_OFF
+    PAYMENT_SYSTEM_OFF;
 }

@@ -173,14 +173,14 @@ public class TestPaymentOSGIWithTestPaymentBundle extends TestOSGIBase {
         } else if (expectedException != null) {
             paymentChecker.checkPayment(account.getId(), 1, callContext, new ExpectedPaymentCheck(new LocalDate(2012, 4, 1), new BigDecimal("399.95"), PaymentStatus.PLUGIN_FAILURE, invoice.getId(), Currency.USD));
         } else if (expectedRuntimeException != null) {
-            paymentChecker.checkPayment(account.getId(), 1, callContext, new ExpectedPaymentCheck(new LocalDate(2012, 4, 1), new BigDecimal("399.95"), PaymentStatus.UNKNOWN, invoice.getId(), Currency.USD));
+            paymentChecker.checkPayment(account.getId(), 1, callContext, new ExpectedPaymentCheck(new LocalDate(2012, 4, 1), new BigDecimal("399.95"), PaymentStatus.PLUGIN_FAILURE, invoice.getId(), Currency.USD));
         }
     }
 
 
     private PaymentPluginApiWithTestControl getTestPluginPaymentApi() {
         PaymentPluginApiWithTestControl result = (PaymentPluginApiWithTestControl) paymentPluginApiOSGIServiceRegistration.getServiceForName(BeatrixIntegrationModule.OSGI_PLUGIN_NAME);
-        Assert.assertNotNull(result);
+         Assert.assertNotNull(result);
         return result;
     }
 }

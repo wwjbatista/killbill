@@ -20,7 +20,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
+import org.osgi.service.log.LogService;
 import org.skife.jdbi.v2.Transaction;
 import org.skife.jdbi.v2.TransactionStatus;
 
@@ -60,17 +62,20 @@ public class BusinessInvoiceAndInvoicePaymentDao extends BusinessAnalyticsDaoBas
     public BusinessInvoiceAndInvoicePaymentDao(final OSGIKillbillLogService logService,
                                                final OSGIKillbillAPI osgiKillbillAPI,
                                                final OSGIKillbillDataSource osgiKillbillDataSource,
-                                               final BusinessAccountDao businessAccountDao) {
-        super(osgiKillbillDataSource);
+                                               final BusinessAccountDao businessAccountDao,
+                                               final Executor executor) {
+        super(logService, osgiKillbillDataSource);
         this.businessAccountDao = businessAccountDao;
-        this.businessInvoiceDao = new BusinessInvoiceDao(osgiKillbillDataSource);
-        this.businessInvoicePaymentDao = new BusinessInvoicePaymentDao(osgiKillbillDataSource);
-        bacFactory = new BusinessAccountFactory(logService, osgiKillbillAPI);
-        binFactory = new BusinessInvoiceFactory(logService, osgiKillbillAPI);
+        this.businessInvoiceDao = new BusinessInvoiceDao(logService, osgiKillbillDataSource);
+        this.businessInvoicePaymentDao = new BusinessInvoicePaymentDao(logService, osgiKillbillDataSource);
+        bacFactory = new BusinessAccountFactory(logService, osgiKillbillAPI, executor);
+        binFactory = new BusinessInvoiceFactory(logService, osgiKillbillAPI, executor);
         bipFactory = new BusinessInvoicePaymentFactory(logService, osgiKillbillAPI);
     }
 
     public void update(final UUID accountId, final CallContext context) throws AnalyticsRefreshException {
+        logService.log(LogService.LOG_INFO, "Starting rebuild of Analytics invoices and payments for account " + accountId);
+
         // Recompute the account record
         final BusinessAccountModelDao bac = bacFactory.createBusinessAccount(accountId, context);
 
@@ -88,6 +93,8 @@ public class BusinessInvoiceAndInvoicePaymentDao extends BusinessAnalyticsDaoBas
                 return null;
             }
         });
+
+        logService.log(LogService.LOG_INFO, "Finished rebuild of Analytics invoices and payments for account " + accountId);
     }
 
     @VisibleForTesting

@@ -16,23 +16,20 @@
 
 package com.ning.billing.util.cache;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
-import org.skife.jdbi.v2.Handle;
 import org.skife.jdbi.v2.IDBI;
-import org.skife.jdbi.v2.tweak.HandleCallback;
 
 import com.ning.billing.ObjectType;
 import com.ning.billing.util.cache.Cachable.CacheType;
 import com.ning.billing.util.dao.NonEntityDao;
-import com.ning.billing.util.dao.TableName;
 
 import net.sf.ehcache.loader.CacheLoader;
 
+@Singleton
 public class AccountRecordIdCacheLoader extends BaseCacheLoader implements CacheLoader {
 
     @Inject
@@ -41,22 +38,24 @@ public class AccountRecordIdCacheLoader extends BaseCacheLoader implements Cache
     }
 
     @Override
-    public Object load(final Object key, final Object argument) {
+    public CacheType getCacheType() {
+        return CacheType.ACCOUNT_RECORD_ID;
+    }
 
+    @Override
+    public Object load(final Object key, final Object argument) {
         checkCacheLoaderStatus();
 
-        if (!(argument instanceof ObjectType)) {
-            throw new IllegalArgumentException("Unexpected argument type of " +
-                                               argument != null ? argument.getClass().getName() : "null");
-        }
         if (!(key instanceof String)) {
-            throw new IllegalArgumentException("Unexpected key type of " +
-                                               key != null ? key.getClass().getName() : "null");
-
+            throw new IllegalArgumentException("Unexpected key type of " + key.getClass().getName());
         }
+        if (!(argument instanceof CacheLoaderArgument)) {
+            throw new IllegalArgumentException("Unexpected key type of " + argument.getClass().getName());
+        }
+
         final String objectId = (String) key;
-        final ObjectType objectType = (ObjectType) argument;
-        Long value = nonEntityDao.retrieveAccountRecordIdFromObject(UUID.fromString(objectId), objectType, null);
-        return value;
+        final ObjectType objectType = ((CacheLoaderArgument) argument).getObjectType();
+
+        return nonEntityDao.retrieveAccountRecordIdFromObject(UUID.fromString(objectId), objectType, null);
     }
 }

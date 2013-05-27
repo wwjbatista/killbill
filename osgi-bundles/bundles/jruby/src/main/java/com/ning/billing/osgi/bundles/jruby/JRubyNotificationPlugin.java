@@ -16,31 +16,34 @@
 
 package com.ning.billing.osgi.bundles.jruby;
 
-import org.jruby.embed.ScriptingContainer;
-import org.jruby.javasupport.JavaEmbedUtils;
+import org.jruby.Ruby;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.log.LogService;
 
 import com.ning.billing.beatrix.bus.api.ExtBusEvent;
+import com.ning.billing.notification.plugin.api.NotificationPluginApi;
 import com.ning.billing.osgi.api.config.PluginRubyConfig;
+import com.ning.billing.payment.plugin.api.PaymentPluginApiException;
 import com.ning.killbill.osgi.libs.killbill.OSGIKillbillEventDispatcher.OSGIKillbillEventHandler;
 
 public class JRubyNotificationPlugin extends JRubyPlugin implements OSGIKillbillEventHandler {
 
-    public JRubyNotificationPlugin(final PluginRubyConfig config, final ScriptingContainer container,
-                                   final BundleContext bundleContext, final LogService logger) {
-        super(config, container, bundleContext, logger);
-    }
-
-    @Override
-    public void startPlugin(final BundleContext context) {
-        super.startPlugin(context);
+    public JRubyNotificationPlugin(final PluginRubyConfig config, final BundleContext bundleContext, final LogService logger) {
+        super(config, bundleContext, logger);
     }
 
     @Override
     public void handleKillbillEvent(final ExtBusEvent killbillEvent) {
-        checkValidNotificationPlugin();
-        checkPluginIsRunning();
-        pluginInstance.callMethod("on_event", JavaEmbedUtils.javaToRuby(getRuntime(), killbillEvent));
+        try {
+            callWithRuntimeAndChecking(new PluginCallback(VALIDATION_PLUGIN_TYPE.NOTIFICATION) {
+                @Override
+                public Void doCall(final Ruby runtime) throws PaymentPluginApiException {
+                    ((NotificationPluginApi) pluginInstance).onEvent(killbillEvent);
+                    return null;
+                }
+            });
+        } catch (PaymentPluginApiException e) {
+            throw new IllegalStateException("Unexpected PaymentApiException for notification plugin", e);
+        }
     }
 }
