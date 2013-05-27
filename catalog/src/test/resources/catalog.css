@@ -1,0 +1,55 @@
+
+/* Catalog */
+catalog
+{
+background-color: #ffffff;
+width: 100%;
+font:15px arial,sans-serif;
+margin: 25px;
+}
+
+/* Effective Date */
+effectiveDate:before 
+{
+content: "Effective Date: "
+}
+
+effectiveDate:after 
+{
+content: '\a' ; white-space: pre; 
+}
+
+
+/* Catalog Name */
+catalogName
+{
+width: 100%;
+text-align:left;
+color:#ff0000;
+font-size:40px;
+margin-left: 100px;
+}
+catalogName:after 
+{
+content: '\a' ; white-space: pre; 
+}
+
+/* Currencies */
+currencies:before
+{
+content:"Currencies:"
+}
+
+
+
+/* Products */
+products
+{
+display: block;
+margin-bottom: 30pt;
+margin-left: 0;
+}
+product:before
+{
+content: "Name:" attr(name);
+}
