@@ -19,11 +19,12 @@ package org.killbill.billing.jaxrs;
 
 import java.io.File;
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.UUID;
 
 import org.killbill.automaton.StateMachineConfig;
 import org.killbill.billing.account.api.ImmutableAccountData;
-import org.killbill.billing.catalog.api.Catalog;
+import org.killbill.billing.catalog.api.StaticCatalog;
 import org.killbill.billing.client.model.gen.Account;
 import org.killbill.billing.client.model.gen.Tenant;
 import org.killbill.billing.notification.plugin.api.ExtBusEventType;
@@ -88,6 +89,10 @@ public class TestCache extends TestJaxrsBase {
         assertTrue(accountImmutableCache.isKeyInCache(accountRecordId));
         assertTrue(accountBcdCache.isKeyInCache(input.getAccountId()));
 
+        // Make sure all events have been fully processed
+        clock.addDays(1);
+        callbackServlet.assertListenerStatus();
+
         // invalidate caches per account level by accountId
         adminApi.invalidatesCacheByAccount(input.getAccountId(), requestOptions);
 
@@ -120,7 +125,7 @@ public class TestCache extends TestJaxrsBase {
         final CacheController<String, String> tenantKvCache = cacheControllerDispatcher.getCacheController(CacheType.TENANT_KV);
         final CacheController<Long, PerTenantConfig> tenantConfigCache = cacheControllerDispatcher.getCacheController(CacheType.TENANT_CONFIG);
         final CacheController<Long, OverdueConfig> tenantOverdueConfigCache = cacheControllerDispatcher.getCacheController(CacheType.TENANT_OVERDUE_CONFIG);
-        final CacheController<Long, Catalog> tenantCatalogCache = cacheControllerDispatcher.getCacheController(CacheType.TENANT_CATALOG);
+        final CacheController<Long, List<StaticCatalog>> tenantCatalogCache = cacheControllerDispatcher.getCacheController(CacheType.TENANT_CATALOG);
 
         // verify that they are not null and have the expected tenant information
         assertTrue(tenantRecordIdCache.isKeyInCache(currentTenant.getTenantId().toString()));

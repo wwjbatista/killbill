@@ -19,8 +19,8 @@ package org.killbill.billing.catalog.io;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 
 import org.killbill.billing.catalog.CatalogTestSuiteNoDB;
 import org.killbill.billing.catalog.DefaultDuration;
@@ -43,7 +43,6 @@ import org.killbill.billing.catalog.api.PhaseType;
 import org.killbill.billing.catalog.api.Plan;
 import org.killbill.billing.catalog.api.ProductCategory;
 import org.killbill.billing.catalog.api.TimeUnit;
-import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.xmlloader.XMLLoader;
 import org.killbill.xmlloader.XMLWriter;
 import org.testng.annotations.Test;
@@ -58,9 +57,10 @@ public class TestXMLWriter extends CatalogTestSuiteNoDB {
     @Test(groups = "fast")
     public void testVersionedCatalog() throws Exception {
         final StandaloneCatalog catalog = XMLLoader.getObjectFromString(Resources.getResource("SpyCarAdvanced.xml").toExternalForm(), StandaloneCatalog.class);
-        final DefaultVersionedCatalog versionedCatalog = new DefaultVersionedCatalog(clock);
+        final DefaultVersionedCatalog versionedCatalog = new DefaultVersionedCatalog();
         versionedCatalog.add(catalog);
-        final String newCatalogStr = XMLWriter.writeXML(versionedCatalog, DefaultVersionedCatalog.class);
+        final Class serializableClass = versionedCatalog.getClass();
+        final String newCatalogStr = XMLWriter.writeXML(versionedCatalog, serializableClass);
         //System.err.println(newCatalogStr);
     }
 
@@ -71,7 +71,7 @@ public class TestXMLWriter extends CatalogTestSuiteNoDB {
         final String oldCatalogStr = XMLWriter.writeXML(catalog, StandaloneCatalog.class);
         //System.err.println(oldCatalogStr);
 
-        final StandaloneCatalog oldCatalog = XMLLoader.getObjectFromStream(new URI("dummy"), new ByteArrayInputStream(oldCatalogStr.getBytes(Charset.forName("UTF-8"))), StandaloneCatalog.class);
+        final StandaloneCatalog oldCatalog = XMLLoader.getObjectFromStream(new ByteArrayInputStream(oldCatalogStr.getBytes(Charset.forName("UTF-8"))), StandaloneCatalog.class);
         final String oldCatalogStr2 = XMLWriter.writeXML(oldCatalog, StandaloneCatalog.class);
         assertEquals(oldCatalogStr2, oldCatalogStr);
     }
@@ -85,7 +85,7 @@ public class TestXMLWriter extends CatalogTestSuiteNoDB {
         final DefaultProduct newProduct = new DefaultProduct();
         newProduct.setName("Dynamic");
         newProduct.setCatagory(ProductCategory.BASE);
-        newProduct.initialize((StandaloneCatalog) mutableCatalog, new URI("dummy"));
+        newProduct.initialize((StandaloneCatalog) mutableCatalog);
 
         mutableCatalog.addProduct(newProduct);
 
@@ -106,17 +106,16 @@ public class TestXMLWriter extends CatalogTestSuiteNoDB {
         newPlan.setInitialPhases(new DefaultPlanPhase[]{trialPhase});
         newPlan.setFinalPhase(evergreenPhase);
         newPlan.setRecurringBillingMode(BillingMode.IN_ADVANCE);
-        // TODO Ordering breaks
+        newPlan.initialize((StandaloneCatalog) mutableCatalog);
         mutableCatalog.addPlan(newPlan);
-        newPlan.initialize((StandaloneCatalog) mutableCatalog, new URI("dummy"));
 
         final String newCatalogStr = XMLWriter.writeXML((StandaloneCatalog) mutableCatalog, StandaloneCatalog.class);
-        final StandaloneCatalog newCatalog = XMLLoader.getObjectFromStream(new URI("dummy"), new ByteArrayInputStream(newCatalogStr.getBytes(Charset.forName("UTF-8"))), StandaloneCatalog.class);
-        assertEquals(newCatalog.getCurrentPlans().size(), catalog.getCurrentPlans().size() + 1);
+        final StandaloneCatalog newCatalog = XMLLoader.getObjectFromStream(new ByteArrayInputStream(newCatalogStr.getBytes(Charset.forName("UTF-8"))), StandaloneCatalog.class);
+        assertEquals(newCatalog.getPlans().size(), catalog.getPlans().size() + 1);
 
-        final Plan plan = newCatalog.findCurrentPlan("dynamic-monthly");
+        final Plan plan = newCatalog.findPlan("dynamic-monthly");
         assertEquals(plan.getName(), "dynamic-monthly");
-        assertEquals(plan.getPriceListName(), DefaultPriceListSet.DEFAULT_PRICELIST_NAME);
+        assertEquals(plan.getPriceList().getName(), DefaultPriceListSet.DEFAULT_PRICELIST_NAME);
         assertEquals(plan.getProduct().getName(), "Dynamic");
         assertEquals(plan.getProduct().getCategory(), ProductCategory.BASE);
         assertEquals(plan.getInitialPhases().length, 1);

@@ -49,6 +49,7 @@ public class InternalCallContextFactory {
     // Long, not long, to avoid NPE with ==
     public static final Long INTERNAL_TENANT_RECORD_ID = 0L;
 
+    // This needs to be kept in sync with KillbillMDCInsertingServletFilter
     public static final String MDC_KB_ACCOUNT_RECORD_ID = "kb.accountRecordId";
     public static final String MDC_KB_TENANT_RECORD_ID = "kb.tenantRecordId";
     public static final String MDC_KB_USER_TOKEN = "kb.userToken";
@@ -146,19 +147,13 @@ public class InternalCallContextFactory {
         return createInternalTenantContext(tenantRecordId, accountRecordId);
     }
 
-    public InternalTenantContext recreateInternalTenantContextWithAccountRecordId(final UUID objectId, final ObjectType objectType, final InternalTenantContext inputContext) {
-        final Long tenantRecordId = inputContext.getTenantRecordId();
-        final Long accountRecordId = getAccountRecordIdSafe(objectId, objectType, tenantRecordId);
-        return createInternalTenantContext(tenantRecordId, accountRecordId);
-    }
-
-        /**
-         * Create an internal tenant callcontext
-         *
-         * @param tenantRecordId  tenant_record_id (cannot be null)
-         * @param accountRecordId account_record_id (cannot be null for INSERT operations)
-         * @return internal tenant callcontext
-         */
+    /**
+     * Create an internal tenant callcontext
+     *
+     * @param tenantRecordId  tenant_record_id (cannot be null)
+     * @param accountRecordId account_record_id (cannot be null for INSERT operations)
+     * @return internal tenant callcontext
+     */
     public InternalTenantContext createInternalTenantContext(final Long tenantRecordId, @Nullable final Long accountRecordId) {
         populateMDCContext(null, accountRecordId, tenantRecordId);
 
@@ -204,16 +199,25 @@ public class InternalCallContextFactory {
         //Preconditions.checkState(tenantRecordIdFromContext.equals(tenantRecordIdFromObject),
         //                         "tenant of the pointed object (%s) and the callcontext (%s) don't match!", tenantRecordIdFromObject, tenantRecordIdFromContext);
 
-        return createInternalCallContext(objectId, objectType, context.getUserName(), context.getCallOrigin(),
-                                         context.getUserType(), context.getUserToken(), context.getReasonCode(), context.getComments(),
-                                         context);
+        final Long tenantRecordId = getTenantRecordIdSafe(context);
+        final Long accountRecordId = getAccountRecordIdSafe(objectId, objectType, context);
+        return createInternalCallContext(tenantRecordId,
+                                         accountRecordId,
+                                         context.getUserName(),
+                                         context.getCallOrigin(),
+                                         context.getUserType(),
+                                         context.getUserToken(),
+                                         context.getReasonCode(),
+                                         context.getComments(),
+                                         context.getCreatedDate(),
+                                         context.getUpdatedDate());
     }
 
     // Used by the payment retry service
     public InternalCallContext createInternalCallContext(final UUID objectId, final ObjectType objectType, final String userName,
                                                          final CallOrigin callOrigin, final UserType userType, @Nullable final UUID userToken, final Long tenantRecordId) {
         final Long accountRecordId = getAccountRecordIdSafe(objectId, objectType, tenantRecordId);
-        return createInternalCallContext(tenantRecordId, accountRecordId, userName, callOrigin, userType, userToken, null, null);
+        return createInternalCallContext(tenantRecordId, accountRecordId, userName, callOrigin, userType, userToken, null, null, null, null);
     }
 
     /**
@@ -231,7 +235,7 @@ public class InternalCallContextFactory {
      */
     public InternalCallContext createInternalCallContext(@Nullable final Long tenantRecordId, @Nullable final Long accountRecordId, final String userName,
                                                          final CallOrigin callOrigin, final UserType userType, @Nullable final UUID userToken) {
-        return createInternalCallContext(tenantRecordId, accountRecordId, userName, callOrigin, userType, userToken, null, null);
+        return createInternalCallContext(tenantRecordId, accountRecordId, userName, callOrigin, userType, userToken, null, null, null, null);
     }
 
     /**
@@ -273,19 +277,16 @@ public class InternalCallContextFactory {
         return new InternalCallContext(context, accountRecordId, fixedOffsetTimeZone, referenceTime, context.getCreatedDate());
     }
 
-    private InternalCallContext createInternalCallContext(final UUID objectId, final ObjectType objectType, final String userName,
-                                                          final CallOrigin callOrigin, final UserType userType, @Nullable final UUID userToken,
-                                                          @Nullable final String reasonCode, @Nullable final String comment,
-                                                          final TenantContext tenantContext) {
-        final Long tenantRecordId = getTenantRecordIdSafe(tenantContext);
-        final Long accountRecordId = getAccountRecordIdSafe(objectId, objectType, tenantContext);
-        return createInternalCallContext(tenantRecordId, accountRecordId, userName, callOrigin, userType, userToken,
-                                         reasonCode, comment);
-    }
-
-    private InternalCallContext createInternalCallContext(@Nullable final Long tenantRecordId, @Nullable final Long accountRecordId, final String userName,
-                                                          final CallOrigin callOrigin, final UserType userType, @Nullable final UUID userToken,
-                                                          @Nullable final String reasonCode, @Nullable final String comment) {
+    private InternalCallContext createInternalCallContext(@Nullable final Long tenantRecordId,
+                                                          @Nullable final Long accountRecordId,
+                                                          final String userName,
+                                                          final CallOrigin callOrigin,
+                                                          final UserType userType,
+                                                          @Nullable final UUID userToken,
+                                                          @Nullable final String reasonCode,
+                                                          @Nullable final String comment,
+                                                          @Nullable final DateTime createdDate,
+                                                          @Nullable final DateTime updatedDate) {
         final Long nonNulTenantRecordId = MoreObjects.firstNonNull(tenantRecordId, INTERNAL_TENANT_RECORD_ID);
 
         final DateTimeZone fixedOffsetTimeZone;
@@ -312,8 +313,8 @@ public class InternalCallContextFactory {
                                        userType,
                                        reasonCode,
                                        comment,
-                                       clock.getUTCNow(),
-                                       clock.getUTCNow());
+                                       createdDate != null ? createdDate : clock.getUTCNow(),
+                                       updatedDate != null ? createdDate : clock.getUTCNow());
     }
 
     private ImmutableAccountData getImmutableAccountData(final Long accountRecordId, final Long tenantRecordId) {
@@ -333,7 +334,10 @@ public class InternalCallContextFactory {
             MDC.put(MDC_KB_ACCOUNT_RECORD_ID, String.valueOf(accountRecordId));
         }
         MDC.put(MDC_KB_TENANT_RECORD_ID, String.valueOf(tenantRecordId));
-        MDC.put(MDC_KB_USER_TOKEN, userToken != null ? userToken.toString() : null);
+        // Make sure that if there is already a userToken in the MDC context, don't overwrite it
+        if (userToken != null) {
+            MDC.put(MDC_KB_USER_TOKEN, userToken.toString());
+        }
     }
 
     //
@@ -389,7 +393,8 @@ public class InternalCallContextFactory {
         if (context.getTenantId() == null) {
             return INTERNAL_TENANT_RECORD_ID;
         } else {
-            // This is always safe (the tenant context was created from the api key and secret)
+            // This is always safe coming from JAX-RS (the tenant context was created from the api key and secret),
+            // but not when coming from plugins via API
             return getTenantRecordIdUnsafe(context.getTenantId(), ObjectType.TENANT);
         }
     }
@@ -416,9 +421,6 @@ public class InternalCallContextFactory {
 
     private boolean objectBelongsToTheRightTenant(final UUID objectId, final ObjectType objectType, final Long realTenantRecordId) throws ObjectDoesNotExist {
         final Long objectTenantRecordId = getTenantRecordIdUnsafe(objectId, objectType);
-        if (objectTenantRecordId == null) {
-            throw new ObjectDoesNotExist(String.format("Object id=%s type=%s doesn't exist!", objectId, objectType));
-        }
         return objectTenantRecordId.equals(realTenantRecordId);
     }
 
@@ -431,7 +433,12 @@ public class InternalCallContextFactory {
     }
 
     private Long getTenantRecordIdUnsafe(final UUID objectId, final ObjectType objectType) {
-        return nonEntityDao.retrieveTenantRecordIdFromObject(objectId, objectType, tenantRecordIdCacheController);
+        final Long objectTenantRecordId = nonEntityDao.retrieveTenantRecordIdFromObject(objectId, objectType, tenantRecordIdCacheController);
+        // The tenant should always exist at this point
+        if (objectTenantRecordId == null) {
+            throw new ObjectDoesNotExist(String.format("Object id=%s type=%s doesn't exist!", objectId, objectType));
+        }
+        return objectTenantRecordId;
     }
 
     public static final class ObjectDoesNotExist extends IllegalStateException {

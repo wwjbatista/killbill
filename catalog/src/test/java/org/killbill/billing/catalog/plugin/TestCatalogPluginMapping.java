@@ -48,7 +48,7 @@ public class TestCatalogPluginMapping extends CatalogTestSuiteNoDB {
 
         final StandaloneCatalogMapper mapper = new StandaloneCatalogMapper(inputCatalog.getCatalogName());
 
-        final StandaloneCatalog output = mapper.toStandaloneCatalog(pluginCatalog, inputCatalog.getCatalogURI());
+        final StandaloneCatalog output = mapper.toStandaloneCatalog(pluginCatalog);
         output.setRecurringBillingMode(inputCatalog.getRecurringBillingMode());
         Assert.assertEquals(output, inputCatalog);
 
@@ -56,8 +56,8 @@ public class TestCatalogPluginMapping extends CatalogTestSuiteNoDB {
 
     private StandalonePluginCatalog buildStandalonePluginCatalog(final StandaloneCatalog inputCatalog) throws Exception {
 
-        final TestModelPlanRules rules = new TestModelPlanRules(ImmutableList.<Product>copyOf(inputCatalog.getCurrentProducts()),
-                                                      ImmutableList.<Plan>copyOf(inputCatalog.getCurrentPlans()),
+        final TestModelPlanRules rules = new TestModelPlanRules(ImmutableList.<Product>copyOf(inputCatalog.getProducts()),
+                                                      ImmutableList.<Plan>copyOf(inputCatalog.getPlans()),
                                                       inputCatalog.getPriceLists().getAllPriceLists());
 
         if (inputCatalog.getPlanRules().getCaseChangePlanPolicy() != null) {
@@ -91,13 +91,13 @@ public class TestCatalogPluginMapping extends CatalogTestSuiteNoDB {
             }
         }
         final TestModelStandalonePluginCatalog result = new TestModelStandalonePluginCatalog(new DateTime(inputCatalog.getEffectiveDate()),
-                                                                                   ImmutableList.<Currency>copyOf(inputCatalog.getCurrentSupportedCurrencies()),
-                                                                                   ImmutableList.<Product>copyOf(inputCatalog.getCurrentProducts()),
-                                                                                   ImmutableList.<Plan>copyOf(inputCatalog.getCurrentPlans()),
+                                                                                   ImmutableList.<Currency>copyOf(inputCatalog.getSupportedCurrencies()),
+                                                                                   ImmutableList.<Product>copyOf(inputCatalog.getProducts()),
+                                                                                   ImmutableList.<Plan>copyOf(inputCatalog.getPlans()),
                                                                                    inputCatalog.getPriceLists().getDefaultPricelist(),
                                                                                    ImmutableList.<PriceList>copyOf(inputCatalog.getPriceLists().getChildPriceLists()),
                                                                                    rules,
-                                                                                   ImmutableList.<Unit>copyOf(inputCatalog.getCurrentUnits()));
+                                                                                   ImmutableList.<Unit>copyOf(inputCatalog.getUnits()));
         return result;
     }
 

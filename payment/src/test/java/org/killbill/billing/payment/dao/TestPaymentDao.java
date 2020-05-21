@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2020 Groupon, Inc
+ * Copyright 2014-2020 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -198,7 +198,7 @@ public class TestPaymentDao extends PaymentTestSuiteWithEmbeddedDB {
         assertEquals(transactions.size(), 2);
 
         paymentDao.updatePaymentAndTransactionOnCompletion(accountId, savedTransactionModelDao2.getAttemptId(), savedPayment.getId(), savedTransactionModelDao2.getTransactionType(), "AUTH_ABORTED", "AUTH_SUCCESS", transactionModelDao2.getId(), TransactionStatus.SUCCESS,
-                                                           BigDecimal.ONE, Currency.USD, null, "nothing", internalCallContext);
+                                                           BigDecimal.ONE, Currency.USD, null, "nothing", true, internalCallContext);
 
         final PaymentModelDao savedPayment4 = paymentDao.getPayment(savedPayment.getId(), internalCallContext);
         assertEquals(savedPayment4.getId(), paymentModelDao.getId());
@@ -244,7 +244,7 @@ public class TestPaymentDao extends PaymentTestSuiteWithEmbeddedDB {
         assertEquals(savedTransactionModelDao4.getGatewayErrorMsg(), "nothing");
 
         paymentDao.updatePaymentAndTransactionOnCompletion(accountId, savedTransactionModelDao2.getAttemptId(), savedPayment.getId(), savedTransactionModelDao2.getTransactionType(), "AUTH_ABORTED", null, transactionModelDao2.getId(), TransactionStatus.SUCCESS,
-                                                           BigDecimal.ONE, Currency.USD, null, "nothing", internalCallContext);
+                                                           BigDecimal.ONE, Currency.USD, null, "nothing", true, internalCallContext);
 
         final PaymentModelDao savedPayment4Again = paymentDao.getPayment(savedPayment.getId(), internalCallContext);
         assertEquals(savedPayment4Again.getId(), paymentModelDao.getId());
@@ -252,7 +252,7 @@ public class TestPaymentDao extends PaymentTestSuiteWithEmbeddedDB {
         assertNull(savedPayment4Again.getLastSuccessStateName());
 
         paymentDao.updatePaymentAndTransactionOnCompletion(accountId, savedTransactionModelDao2.getAttemptId(), savedPayment.getId(), savedTransactionModelDao2.getTransactionType(), "AUTH_ABORTED", "AUTH_SUCCESS", transactionModelDao2.getId(), TransactionStatus.SUCCESS,
-                                                           BigDecimal.ONE, Currency.USD, null, "nothing", internalCallContext);
+                                                           BigDecimal.ONE, Currency.USD, null, "nothing", true, internalCallContext);
 
         final PaymentModelDao savedPayment4Final = paymentDao.getPayment(savedPayment.getId(), internalCallContext);
         assertEquals(savedPayment4Final.getId(), paymentModelDao.getId());
@@ -358,7 +358,7 @@ public class TestPaymentDao extends PaymentTestSuiteWithEmbeddedDB {
             final String newPaymentState = "XXX_FAILED";
             paymentDao.updatePaymentAndTransactionOnCompletion(payment.getAccountId(), paymentTransaction.getAttemptId(), payment.getId(), paymentTransaction.getTransactionType(), newPaymentState, payment.getLastSuccessStateName(),
                                                                paymentTransaction.getId(), TransactionStatus.PAYMENT_FAILURE, paymentTransaction.getProcessedAmount(), paymentTransaction.getProcessedCurrency(),
-                                                               paymentTransaction.getGatewayErrorCode(), paymentTransaction.getGatewayErrorMsg(), internalCallContext);
+                                                               paymentTransaction.getGatewayErrorCode(), paymentTransaction.getGatewayErrorMsg(), true, internalCallContext);
         }
 
         final List<PaymentTransactionModelDao> result2 = getPendingTransactions(paymentModelDao.getId());
@@ -375,7 +375,7 @@ public class TestPaymentDao extends PaymentTestSuiteWithEmbeddedDB {
             final String newPaymentState = "XXX_FAILED";
             paymentDao.updatePaymentAndTransactionOnCompletion(payment.getAccountId(), paymentTransaction.getAttemptId(), payment.getId(), paymentTransaction.getTransactionType(), newPaymentState, payment.getLastSuccessStateName(),
                                                                paymentTransaction.getId(), TransactionStatus.PAYMENT_FAILURE, paymentTransaction.getProcessedAmount(), paymentTransaction.getProcessedCurrency(),
-                                                               paymentTransaction.getGatewayErrorCode(), paymentTransaction.getGatewayErrorMsg(), internalCallContext);
+                                                               paymentTransaction.getGatewayErrorCode(), paymentTransaction.getGatewayErrorMsg(), true, internalCallContext);
         }
 
         final List<PaymentTransactionModelDao> result3 = getPendingTransactions(paymentModelDao.getId());
@@ -565,21 +565,39 @@ public class TestPaymentDao extends PaymentTestSuiteWithEmbeddedDB {
 
         final UUID transactionId = UUID.randomUUID();
         final String newStateName = "YYYYYYY";
-        paymentDao.updatePaymentAttempt(rehydratedAttempt.getId(), transactionId, newStateName, internalCallContext);
+        paymentDao.updatePaymentAttemptWithProperties(rehydratedAttempt.getId(),
+                                                      rehydratedAttempt.getPaymentMethodId(),
+                                                      transactionId,
+                                                      newStateName,
+                                                      null,
+                                                      null,
+                                                      rehydratedAttempt.getPluginProperties(),
+                                                      internalCallContext);
 
         final PaymentAttemptModelDao attempt1 = paymentDao.getPaymentAttempt(rehydratedAttempt.getId(), internalCallContext);
         assertEquals(attempt1.getStateName(), newStateName);
         assertEquals(attempt1.getTransactionId(), transactionId);
+        assertNull(attempt1.getAmount());
+        assertNull(attempt1.getCurrency());
 
         final List<PluginProperty> properties = new ArrayList<PluginProperty>();
         properties.add(new PluginProperty("prop1", "value1", false));
         properties.add(new PluginProperty("prop2", "value2", false));
 
         final byte [] serializedProperties = PluginPropertySerializer.serialize(properties);
-        paymentDao.updatePaymentAttemptWithProperties(rehydratedAttempt.getId(), rehydratedAttempt.getPaymentMethodId(), transactionId, newStateName, serializedProperties, internalCallContext);
+        paymentDao.updatePaymentAttemptWithProperties(rehydratedAttempt.getId(),
+                                                      rehydratedAttempt.getPaymentMethodId(),
+                                                      transactionId,
+                                                      newStateName,
+                                                      rehydratedAttempt.getAmount(),
+                                                      rehydratedAttempt.getCurrency(),
+                                                      serializedProperties,
+                                                      internalCallContext);
         final PaymentAttemptModelDao attempt2 = paymentDao.getPaymentAttempt(rehydratedAttempt.getId(), internalCallContext);
         assertEquals(attempt2.getStateName(), newStateName);
         assertEquals(attempt2.getTransactionId(), transactionId);
+        assertEquals(attempt2.getAmount().compareTo(BigDecimal.ONE), 0);
+        assertEquals(attempt2.getCurrency(), Currency.USD);
 
         final Iterable<PluginProperty> properties2 = PluginPropertySerializer.deserialize(attempt2.getPluginProperties());
         checkProperty(properties2, new PluginProperty("prop1", "value1", false));

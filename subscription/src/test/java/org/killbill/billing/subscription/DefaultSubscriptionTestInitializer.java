@@ -27,9 +27,9 @@ import org.killbill.billing.api.TestApiListener;
 import org.killbill.billing.callcontext.InternalCallContext;
 import org.killbill.billing.callcontext.InternalTenantContext;
 import org.killbill.billing.catalog.DefaultCatalogService;
-import org.killbill.billing.catalog.api.Catalog;
 import org.killbill.billing.catalog.api.CatalogService;
 import org.killbill.billing.catalog.api.Currency;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.lifecycle.api.BusService;
 import org.killbill.billing.mock.MockAccountBuilder;
 import org.killbill.billing.subscription.api.SubscriptionBaseInternalApi;
@@ -54,9 +54,9 @@ public class DefaultSubscriptionTestInitializer implements SubscriptionTestIniti
     public DefaultSubscriptionTestInitializer() {
     }
 
-    public Catalog initCatalog(final CatalogService catalogService, final InternalTenantContext context) throws Exception {
+    public VersionedCatalog initCatalog(final CatalogService catalogService, final InternalTenantContext context) throws Exception {
         ((DefaultCatalogService) catalogService).loadCatalog();
-        final Catalog catalog = catalogService.getFullCatalog(true, true, context);
+        final VersionedCatalog catalog = catalogService.getFullCatalog(true, true, context);
         assertNotNull(catalog);
         return catalog;
     }
@@ -128,7 +128,7 @@ public class DefaultSubscriptionTestInitializer implements SubscriptionTestIniti
     }
 
     private void startBusAndRegisterListener(final BusService busService, final TestApiListener testListener) throws Exception {
-        busService.getBus().start();
+        busService.getBus().startQueue();
         busService.getBus().register(testListener);
     }
 
@@ -140,7 +140,7 @@ public class DefaultSubscriptionTestInitializer implements SubscriptionTestIniti
 
     private void stopBusAndUnregisterListener(final BusService busService, final TestApiListener testListener) throws Exception {
         busService.getBus().unregister(testListener);
-        busService.getBus().stop();
+        busService.getBus().stopQueue();
     }
 
     private void stopSubscriptionService(final SubscriptionBaseService subscriptionBaseService) throws Exception {

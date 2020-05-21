@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -39,12 +39,12 @@ import org.killbill.billing.account.api.AccountInternalApi;
 import org.killbill.billing.account.api.ImmutableAccountData;
 import org.killbill.billing.callcontext.InternalCallContext;
 import org.killbill.billing.callcontext.InternalTenantContext;
-import org.killbill.billing.catalog.api.Catalog;
 import org.killbill.billing.catalog.api.CatalogApiException;
 import org.killbill.billing.catalog.api.CatalogInternalApi;
+import org.killbill.billing.catalog.api.StaticCatalog;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.entitlement.AccountEntitlements;
 import org.killbill.billing.entitlement.EntitlementInternalApi;
-import org.killbill.billing.entitlement.EntitlementService;
 import org.killbill.billing.entitlement.api.EntitlementPluginExecution.WithEntitlementPlugin;
 import org.killbill.billing.entitlement.dao.BlockingStateDao;
 import org.killbill.billing.entitlement.engine.core.EntitlementUtils;
@@ -52,10 +52,12 @@ import org.killbill.billing.entitlement.plugin.api.EntitlementContext;
 import org.killbill.billing.entitlement.plugin.api.OperationType;
 import org.killbill.billing.junction.DefaultBlockingState;
 import org.killbill.billing.payment.api.PluginProperty;
-import org.killbill.billing.subscription.api.SubscriptionBase;
+import org.killbill.billing.platform.api.KillbillService.KILLBILL_SERVICES;
 import org.killbill.billing.subscription.api.SubscriptionBaseInternalApi;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseApiException;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseBundle;
+import org.killbill.billing.util.api.AuditLevel;
+import org.killbill.billing.util.audit.AuditLogWithHistory;
 import org.killbill.billing.util.callcontext.CallContext;
 import org.killbill.billing.util.callcontext.InternalCallContextFactory;
 import org.killbill.billing.util.callcontext.TenantContext;
@@ -154,6 +156,24 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
                                                     return subscription.getId().equals(entitlementId);
                                                 }
                                             });
+    }
+
+    @Override
+    public Subscription getSubscriptionForExternalKey(final String externalKey, final TenantContext tenantContext) throws SubscriptionApiException {
+
+        try {
+            final InternalTenantContext contextWithoutAccountRecordId = internalCallContextFactory.createInternalTenantContextWithoutAccountRecordId(tenantContext);
+            final UUID subscriptionId = subscriptionBaseInternalApi.getSubscriptionIdFromSubscriptionExternalKey(externalKey, contextWithoutAccountRecordId);
+            final UUID accountId = internalCallContextFactory.getAccountId(subscriptionId, ObjectType.SUBSCRIPTION, tenantContext);
+            final InternalTenantContext internalTenantContext = internalCallContextFactory.createInternalTenantContext(accountId, tenantContext);
+
+            final Entitlement res = entitlementInternalApi.getEntitlementForExternalKey(externalKey, internalTenantContext);
+            return new DefaultSubscription((DefaultEntitlement) res);
+        } catch (final EntitlementApiException e) {
+            throw new SubscriptionApiException(e);
+        } catch (SubscriptionBaseApiException e) {
+            throw new SubscriptionApiException(e);
+        }
     }
 
     @Override
@@ -310,7 +330,7 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
             final InternalCallContext internalCallContextWithValidAccountId = internalCallContextFactory.createInternalCallContext(account.getId(), callContext);
 
             @Override
-            public Void doCall(final EntitlementApi entitlementApi, final EntitlementContext updatedPluginContext) throws EntitlementApiException {
+            public Void doCall(final EntitlementApi entitlementApi, final DefaultEntitlementContext updatedPluginContext) throws EntitlementApiException {
                 subscriptionBaseInternalApi.updateExternalKey(bundleId, newExternalKey, internalCallContextWithValidAccountId);
                 return null;
             }
@@ -324,7 +344,7 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
         logAddBlockingState(log, inputBlockingState, inputEffectiveDate);
 
         // This is in no way an exhaustive arg validation, but to to ensure plugin would not hijack private entitlement state or service name
-        if (inputBlockingState.getService() == null || inputBlockingState.getService().equals(EntitlementService.ENTITLEMENT_SERVICE_NAME)) {
+        if (inputBlockingState.getService() == null || inputBlockingState.getService().equals(KILLBILL_SERVICES.ENTITLEMENT_SERVICE.getServiceName())) {
             throw new EntitlementApiException(ErrorCode.SUB_BLOCKING_STATE_INVALID_ARG, "Need to specify a valid serviceName");
         }
 
@@ -398,7 +418,7 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
         final WithEntitlementPlugin<Void> addBlockingStateWithPlugin = new WithEntitlementPlugin<Void>() {
 
             @Override
-            public Void doCall(final EntitlementApi entitlementApi, final EntitlementContext updatedPluginContext) throws EntitlementApiException {
+            public Void doCall(final EntitlementApi entitlementApi, final DefaultEntitlementContext updatedPluginContext) throws EntitlementApiException {
                 entitlementUtils.setBlockingStateAndPostBlockingTransitionEvent(blockingState, internalCallContextWithValidAccountId);
                 return null;
             }
@@ -410,7 +430,7 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
     public Iterable<BlockingState> getBlockingStates(final UUID accountId, @Nullable final List<BlockingStateType> typeFilter, @Nullable final List<String> svcsFilter, final OrderingType orderingType, final int timeFilter, final TenantContext tenantContext) throws EntitlementApiException {
         try {
             final InternalTenantContext internalTenantContextWithValidAccountRecordId = internalCallContextFactory.createInternalTenantContext(accountId, tenantContext);
-            final Catalog catalog = catalogInternalApi.getFullCatalog(true, true, internalTenantContextWithValidAccountRecordId);
+            final VersionedCatalog catalog = catalogInternalApi.getFullCatalog(true, true, internalTenantContextWithValidAccountRecordId);
             final List<BlockingState> allBlockingStates = blockingStateDao.getBlockingAllForAccountRecordId(catalog, internalTenantContextWithValidAccountRecordId);
 
             final ImmutableAccountData account = accountApi.getImmutableAccountDataById(accountId, internalTenantContextWithValidAccountRecordId);
@@ -453,6 +473,27 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
         }
     }
 
+    @Override
+    public List<AuditLogWithHistory> getSubscriptionBundleAuditLogsWithHistoryForId(final UUID uuid, final AuditLevel auditLevel, final TenantContext tenantContext) {
+        return subscriptionBaseInternalApi.getSubscriptionBundleAuditLogsWithHistoryForId(uuid, auditLevel, tenantContext);
+    }
+
+    @Override
+    public List<AuditLogWithHistory> getSubscriptionAuditLogsWithHistoryForId(final UUID uuid, final AuditLevel auditLevel, final TenantContext tenantContext) {
+        return subscriptionBaseInternalApi.getSubscriptionAuditLogsWithHistoryForId(uuid, auditLevel, tenantContext);
+    }
+
+    @Override
+    public List<AuditLogWithHistory> getSubscriptionEventAuditLogsWithHistoryForId(final UUID uuid, final AuditLevel auditLevel, final TenantContext tenantContext) {
+        return subscriptionBaseInternalApi.getSubscriptionEventAuditLogsWithHistoryForId(uuid, auditLevel, tenantContext);
+    }
+
+    @Override
+    public List<AuditLogWithHistory> getBlockingStateAuditLogsWithHistoryForId(final UUID blockingId, final AuditLevel auditLevel, final TenantContext context) {
+        return blockingStateDao.getBlockingStateAuditLogsWithHistoryForId(blockingId, auditLevel, internalCallContextFactory.createInternalTenantContext(blockingId, ObjectType.BLOCKING_STATES, context));
+    }
+
+
     private List<SubscriptionBundle> getSubscriptionBundlesForAccount(final UUID accountId, final TenantContext tenantContext) throws SubscriptionApiException {
         final InternalTenantContext internalTenantContextWithValidAccountRecordId = internalCallContextFactory.createInternalTenantContext(accountId, tenantContext);
 
@@ -471,18 +512,18 @@ public class DefaultSubscriptionApi implements SubscriptionApi {
         final List<SubscriptionBundle> bundles = new LinkedList<SubscriptionBundle>();
         for (final UUID bundleId : subscriptionsPerBundle.keySet()) {
             final List<Subscription> subscriptionsForBundle = subscriptionsPerBundle.get(bundleId);
-            final String externalKey = subscriptionsForBundle.get(0).getExternalKey();
+            final String bundleExternalKey = subscriptionsForBundle.get(0).getBundleExternalKey();
 
             final SubscriptionBundleTimeline timeline = new DefaultSubscriptionBundleTimeline(accountId,
                                                                                               bundleId,
-                                                                                              externalKey,
+                                                                                              bundleExternalKey,
                                                                                               accountEntitlements.getEntitlements().get(bundleId),
                                                                                               internalTenantContextWithValidAccountRecordId);
 
             final SubscriptionBaseBundle baseBundle = accountEntitlements.getBundles().get(bundleId);
             final SubscriptionBundle subscriptionBundle = new DefaultSubscriptionBundle(bundleId,
                                                                                         accountId,
-                                                                                        externalKey,
+                                                                                        bundleExternalKey,
                                                                                         subscriptionsForBundle,
                                                                                         timeline,
                                                                                         baseBundle.getOriginalCreatedDate(),

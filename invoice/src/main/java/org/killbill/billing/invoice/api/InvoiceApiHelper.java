@@ -58,6 +58,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 public class InvoiceApiHelper {
@@ -115,7 +116,7 @@ public class InvoiceApiHelper {
                 invoiceModelDaos.add(invoiceModelDao);
             }
 
-            final List<InvoiceItemModelDao> createdInvoiceItems = dao.createInvoices(invoiceModelDaos, internalCallContext);
+            final List<InvoiceItemModelDao> createdInvoiceItems = dao.createInvoices(invoiceModelDaos, null, ImmutableSet.of(), internalCallContext);
             success = true;
 
             return fromInvoiceItemModelDao(createdInvoiceItems);
@@ -199,6 +200,7 @@ public class InvoiceApiHelper {
                                           invoiceItemToBeAdjusted.getPlanName(),
                                           invoiceItemToBeAdjusted.getPhaseName(),
                                           invoiceItemToBeAdjusted.getUsageName(),
+                                          invoiceItemToBeAdjusted.getCatalogEffectiveDate(),
                                           effectiveDate,
                                           effectiveDate,
                                           amountToAdjust,

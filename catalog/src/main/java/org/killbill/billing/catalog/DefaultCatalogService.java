@@ -23,6 +23,7 @@ import javax.inject.Named;
 import org.killbill.billing.callcontext.InternalTenantContext;
 import org.killbill.billing.catalog.api.CatalogApiException;
 import org.killbill.billing.catalog.api.CatalogService;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.catalog.caching.CatalogCache;
 import org.killbill.billing.catalog.glue.CatalogModule;
 import org.killbill.billing.platform.api.KillbillService;
@@ -40,7 +41,6 @@ import com.google.inject.Inject;
 public class DefaultCatalogService implements KillbillService, CatalogService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultCatalogService.class);
-    private static final String CATALOG_SERVICE_NAME = "catalog-service";
 
     private final CatalogConfig config;
     private final TenantInternalApi tenantInternalApi;
@@ -83,20 +83,25 @@ public class DefaultCatalogService implements KillbillService, CatalogService {
 
     @Override
     public String getName() {
-        return CATALOG_SERVICE_NAME;
+        return KILLBILL_SERVICES.CATALOG_SERVICE.getServiceName();
     }
 
     @Override
-    public DefaultVersionedCatalog getFullCatalog(final boolean useDefaultCatalog, final boolean filterTemplateCatalog, final InternalTenantContext context) throws CatalogApiException {
+    public int getRegistrationOrdering() {
+        return KILLBILL_SERVICES.CATALOG_SERVICE.getRegistrationOrdering();
+    }
+
+    @Override
+    public VersionedCatalog getFullCatalog(final boolean useDefaultCatalog, final boolean filterTemplateCatalog, final InternalTenantContext context) throws CatalogApiException {
         return getCatalog(useDefaultCatalog, filterTemplateCatalog, false, context);
     }
 
     @Override
-    public DefaultVersionedCatalog getFullCatalogForInternalUse(final boolean useDefaultCatalog, final boolean filterTemplateCatalog, final InternalTenantContext context) throws CatalogApiException {
+    public VersionedCatalog getFullCatalogForInternalUse(final boolean useDefaultCatalog, final boolean filterTemplateCatalog, final InternalTenantContext context) throws CatalogApiException {
         return getCatalog(useDefaultCatalog, filterTemplateCatalog, true, context);
     }
 
-    private DefaultVersionedCatalog getCatalog(final boolean useDefaultCatalog, final boolean filterTemplateCatalog, final boolean internalUse, final InternalTenantContext context) throws CatalogApiException {
+    private VersionedCatalog getCatalog(final boolean useDefaultCatalog, final boolean filterTemplateCatalog, final boolean internalUse, final InternalTenantContext context) throws CatalogApiException {
         return catalogCache.getCatalog(useDefaultCatalog, filterTemplateCatalog, internalUse, context);
     }
 }

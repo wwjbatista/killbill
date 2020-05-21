@@ -47,6 +47,7 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 public class InvoiceTestUtils {
 
@@ -108,14 +109,14 @@ public class InvoiceTestUtils {
 
         final InvoiceModelDao invoiceModelDao = new InvoiceModelDao(invoice);
         invoiceModelDao.addInvoiceItems(invoiceModelItems);
-        invoiceDao.createInvoices(ImmutableList.<InvoiceModelDao>of(invoiceModelDao), internalCallContext);
+        invoiceDao.createInvoices(ImmutableList.<InvoiceModelDao>of(invoiceModelDao), null, ImmutableSet.of(), internalCallContext);
 
         return invoice;
     }
 
     public static InvoiceItem createInvoiceItem(final Clock clock, final UUID invoiceId, final UUID accountId, final BigDecimal amount, final Currency currency) {
         return new FixedPriceInvoiceItem(invoiceId, accountId, UUID.randomUUID(), UUID.randomUUID(),
-                                         null, "charge back test", "charge back phase", clock.getUTCToday(), amount, currency);
+                                         null, "charge back test", "charge back phase", null, clock.getUTCToday(), amount, currency);
     }
 
     public static InvoicePayment createAndPersistPayment(final InvoiceInternalApi invoicePaymentApi,
@@ -137,7 +138,7 @@ public class InvoiceTestUtils {
         Mockito.when(payment.getProcessedCurrency()).thenReturn(currency);
         Mockito.when(payment.isSuccess()).thenReturn(true);
 
-        invoicePaymentApi.recordPaymentAttemptCompletion(payment.getInvoiceId(), payment.getAmount(), payment.getCurrency(), payment.getProcessedCurrency(), payment.getPaymentId(), payment.getPaymentCookieId(),
+        invoicePaymentApi.recordPaymentAttemptCompletion(payment.getInvoiceId(), payment.getAmount(), payment.getCurrency(), payment.getProcessedCurrency(), payment.getPaymentId(), UUID.randomUUID(), payment.getPaymentCookieId(),
                                                          payment.getPaymentDate(), payment.isSuccess(), callContext);
 
         return payment;

@@ -40,6 +40,8 @@ import org.killbill.billing.entitlement.api.EntitlementAOStatusDryRun;
 import org.killbill.billing.entitlement.api.EntitlementAOStatusDryRun.DryRunChangeReason;
 import org.killbill.billing.subscription.SubscriptionTestSuiteWithEmbeddedDB;
 import org.killbill.billing.subscription.api.SubscriptionBaseTransitionType;
+import org.killbill.billing.subscription.catalog.DefaultSubscriptionCatalogApi;
+import org.killbill.billing.subscription.catalog.SubscriptionCatalog;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -456,7 +458,7 @@ public class TestUserApiAddOn extends SubscriptionTestSuiteWithEmbeddedDB {
         assertEquals(aoCurrentPhase.getPhaseType(), PhaseType.DISCOUNT);
 
         testUtil.assertDateWithin(aoSubscription.getStartDate(), beforeAOCreation, afterAOCreation);
-        assertEquals(aoSubscription.getBundleStartDate(), baseSubscription.getBundleStartDate());
+        assertEquals(aoSubscription.getBundleStartDate().compareTo(baseSubscription.getBundleStartDate()), 0);
 
         // CHECK next AO PHASE EVENT IS INDEED A MONTH AFTER BP STARTED => BUNDLE ALIGNMENT
         SubscriptionBaseTransition aoPendingTranstion = aoSubscription.getPendingTransition();

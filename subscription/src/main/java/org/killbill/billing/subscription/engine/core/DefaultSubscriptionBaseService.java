@@ -22,9 +22,7 @@ import java.util.UUID;
 
 import org.joda.time.DateTime;
 import org.killbill.billing.callcontext.InternalCallContext;
-import org.killbill.billing.catalog.api.Catalog;
 import org.killbill.billing.catalog.api.CatalogApiException;
-import org.killbill.billing.catalog.api.CatalogInternalApi;
 import org.killbill.billing.catalog.api.ProductCategory;
 import org.killbill.billing.platform.api.LifecycleHandlerType;
 import org.killbill.billing.platform.api.LifecycleHandlerType.LifecycleLevel;
@@ -35,6 +33,8 @@ import org.killbill.billing.subscription.api.SubscriptionBaseService;
 import org.killbill.billing.subscription.api.user.DefaultEffectiveSubscriptionEvent;
 import org.killbill.billing.subscription.api.user.DefaultSubscriptionBase;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseTransitionData;
+import org.killbill.billing.subscription.catalog.SubscriptionCatalog;
+import org.killbill.billing.subscription.catalog.SubscriptionCatalogApi;
 import org.killbill.billing.subscription.engine.dao.SubscriptionDao;
 import org.killbill.billing.subscription.events.SubscriptionBaseEvent;
 import org.killbill.billing.subscription.events.SubscriptionBaseEvent.EventType;
@@ -63,7 +63,6 @@ import com.google.inject.Inject;
 public class DefaultSubscriptionBaseService implements EventListener, SubscriptionBaseService {
 
     public static final String NOTIFICATION_QUEUE_NAME = "subscription-events";
-    public static final String SUBSCRIPTION_SERVICE_NAME = "subscription-service";
 
     private static final Logger log = LoggerFactory.getLogger(DefaultSubscriptionBaseService.class);
 
@@ -74,7 +73,7 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
     private final NotificationQueueService notificationQueueService;
     private final InternalCallContextFactory internalCallContextFactory;
     private final SubscriptionBaseApiService apiService;
-    private final CatalogInternalApi catalogInternalApi;
+    private final SubscriptionCatalogApi subscriptionCatalogApi;
 
     private NotificationQueue subscriptionEventQueue;
 
@@ -86,7 +85,7 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
                                           final NotificationQueueService notificationQueueService,
                                           final InternalCallContextFactory internalCallContextFactory,
                                           final SubscriptionBaseApiService apiService,
-                                          final CatalogInternalApi catalogInternalApi) {
+                                          final SubscriptionCatalogApi subscriptionCatalogApi) {
         this.clock = clock;
         this.dao = dao;
         this.planAligner = planAligner;
@@ -94,12 +93,17 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
         this.notificationQueueService = notificationQueueService;
         this.internalCallContextFactory = internalCallContextFactory;
         this.apiService = apiService;
-        this.catalogInternalApi = catalogInternalApi;
+        this.subscriptionCatalogApi = subscriptionCatalogApi;
     }
 
     @Override
     public String getName() {
-        return SUBSCRIPTION_SERVICE_NAME;
+        return KILLBILL_SERVICES.SUBSCRIPTION_BASE_SERVICE.getServiceName();
+    }
+
+    @Override
+    public int getRegistrationOrdering() {
+        return KILLBILL_SERVICES.SUBSCRIPTION_BASE_SERVICE.getRegistrationOrdering();
     }
 
     @LifecycleHandlerType(LifecycleLevel.INIT_SERVICE)
@@ -116,7 +120,7 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
                     final SubscriptionNotificationKey key = (SubscriptionNotificationKey) inputKey;
                     final SubscriptionBaseEvent event = dao.getEventById(key.getEventId(), internalCallContextFactory.createInternalTenantContext(tenantRecordId, accountRecordId));
                     if (event == null) {
-                        // This can be expected if the event is soft deleted (is_active = 0)
+                        // This can be expected if the event is soft deleted (is_active = '0')
                         log.debug("Failed to extract event for notification key {}", inputKey);
                         return;
                     }
@@ -126,7 +130,7 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
                 }
             };
 
-            subscriptionEventQueue = notificationQueueService.createNotificationQueue(SUBSCRIPTION_SERVICE_NAME,
+            subscriptionEventQueue = notificationQueueService.createNotificationQueue(KILLBILL_SERVICES.SUBSCRIPTION_BASE_SERVICE.getServiceName(),
                                                                                       NOTIFICATION_QUEUE_NAME,
                                                                                       queueHandler);
         } catch (final NotificationQueueAlreadyExists e) {
@@ -154,8 +158,8 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
         }
 
         try {
-            final Catalog fullCatalog = catalogInternalApi.getFullCatalog(true, true, context);
-            final DefaultSubscriptionBase subscription = (DefaultSubscriptionBase) dao.getSubscriptionFromId(event.getSubscriptionId(), fullCatalog, context);
+            final SubscriptionCatalog catalog = subscriptionCatalogApi.getFullCatalog(context);
+            final DefaultSubscriptionBase subscription = (DefaultSubscriptionBase) dao.getSubscriptionFromId(event.getSubscriptionId(), catalog, context);
             if (subscription == null) {
                 log.warn("Error retrieving subscriptionId='{}'", event.getSubscriptionId());
                 return;
@@ -169,10 +173,10 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
 
             boolean eventSent = false;
             if (event.getType() == EventType.PHASE) {
-                eventSent = onPhaseEvent(subscription, event, fullCatalog, context);
+                eventSent = onPhaseEvent(subscription, event, catalog, context);
             } else if (event.getType() == EventType.API_USER && subscription.getCategory() == ProductCategory.BASE) {
                 final CallContext callContext = internalCallContextFactory.createCallContext(context);
-                eventSent = onBasePlanEvent(subscription, event, fullCatalog, callContext);
+                eventSent = onBasePlanEvent(subscription, event, catalog, callContext);
             } else if (event.getType() == EventType.BCD_UPDATE) {
                 eventSent = false;
             }
@@ -193,9 +197,9 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
         }
     }
 
-    private boolean onPhaseEvent(final DefaultSubscriptionBase subscription, final SubscriptionBaseEvent readyPhaseEvent, final Catalog fullCatalog, final InternalCallContext context) {
+    private boolean onPhaseEvent(final DefaultSubscriptionBase subscription, final SubscriptionBaseEvent readyPhaseEvent, final SubscriptionCatalog catalog, final InternalCallContext context) {
         try {
-            final TimedPhase nextTimedPhase = planAligner.getNextTimedPhase(subscription, readyPhaseEvent.getEffectiveDate(), fullCatalog, context);
+            final TimedPhase nextTimedPhase = planAligner.getNextTimedPhase(subscription, readyPhaseEvent.getEffectiveDate(), catalog, context);
             final PhaseEvent nextPhaseEvent = (nextTimedPhase != null) ?
                                               PhaseEventData.createNextPhaseEvent(subscription.getId(),
                                                                                   nextTimedPhase.getPhase().getName(), nextTimedPhase.getStartPhase()) :
@@ -211,7 +215,7 @@ public class DefaultSubscriptionBaseService implements EventListener, Subscripti
         return false;
     }
 
-    private boolean onBasePlanEvent(final DefaultSubscriptionBase baseSubscription, final SubscriptionBaseEvent event, final Catalog fullCatalog, final CallContext context) throws CatalogApiException {
+    private boolean onBasePlanEvent(final DefaultSubscriptionBase baseSubscription, final SubscriptionBaseEvent event, final SubscriptionCatalog fullCatalog, final CallContext context) throws CatalogApiException {
         apiService.handleBasePlanEvent(baseSubscription, event, fullCatalog, context);
         return true;
     }

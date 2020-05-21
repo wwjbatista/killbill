@@ -96,7 +96,7 @@ public class TestCatalog extends TestJaxrsBase {
         Assert.assertEquals(catalogsJson.get(0).getName(), "Firearms");
         Assert.assertEquals(catalogsJson.get(0).getEffectiveDate().toLocalDate(), new LocalDate("2011-01-01"));
         Assert.assertEquals(catalogsJson.get(0).getCurrencies().size(), 3);
-        Assert.assertEquals(catalogsJson.get(0).getProducts().size(), 13);
+        Assert.assertEquals(catalogsJson.get(0).getProducts().size(), 15);
         Assert.assertEquals(catalogsJson.get(0).getPriceLists().size(), 7);
 
         for (final Product productJson : catalogsJson.get(0).getProducts()) {
@@ -202,6 +202,14 @@ public class TestCatalog extends TestJaxrsBase {
         Assert.assertEquals(catalogsJson.get(0).getPriceLists().get(0).getName(), "DEFAULT");
         Assert.assertEquals(catalogsJson.get(0).getPriceLists().get(0).getPlans().size(), 2);
     }
+
+    @Test(groups = "slow", expectedExceptions = KillBillClientException.class)
+    public void testAddBadSimplePlan() throws Exception {
+        // Verify passing an invalid planId will throw an exception
+        final String invalidPlanId = "43d3cde7-c06c-4713-8d0a-db1adfe163db";
+        catalogApi.addSimplePlan(new SimplePlan(invalidPlanId, "Foo", ProductCategory.BASE, Currency.USD, BigDecimal.TEN, BillingPeriod.MONTHLY, 0, TimeUnit.UNLIMITED, ImmutableList.<String>of()), requestOptions);
+    }
+
 
     @Test(groups = "slow")
     public void testCatalogDeletionInTestMode() throws Exception {

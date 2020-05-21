@@ -106,7 +106,7 @@ public abstract class OverdueTestSuiteWithEmbeddedDB extends GuicyKillbillTestSu
             return;
         }
 
-        final Injector injector = Guice.createInjector(new TestOverdueModuleWithEmbeddedDB(configSource));
+        final Injector injector = Guice.createInjector(new TestOverdueModuleWithEmbeddedDB(configSource, clock));
         injector.injectMembers(this);
     }
 
@@ -118,7 +118,7 @@ public abstract class OverdueTestSuiteWithEmbeddedDB extends GuicyKillbillTestSu
 
         super.beforeMethod();
         cacheControllerDispatcher.clearAll();
-        bus.start();
+        bus.startQueue();
         bus.register(listener);
         service.loadConfig();
         service.initialize();
@@ -133,6 +133,6 @@ public abstract class OverdueTestSuiteWithEmbeddedDB extends GuicyKillbillTestSu
 
         service.stop();
         bus.unregister(listener);
-        bus.stop();
+        bus.stopQueue();
     }
 }

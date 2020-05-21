@@ -23,20 +23,23 @@ import java.util.UUID;
 
 import org.joda.time.DateTime;
 import org.killbill.billing.catalog.api.BillingActionPolicy;
+import org.killbill.billing.catalog.api.BillingAlignment;
 import org.killbill.billing.catalog.api.BillingPeriod;
 import org.killbill.billing.catalog.api.Plan;
 import org.killbill.billing.catalog.api.PlanPhase;
-import org.killbill.billing.catalog.api.PlanPhasePriceOverride;
 import org.killbill.billing.catalog.api.PlanPhaseSpecifier;
 import org.killbill.billing.catalog.api.PriceList;
 import org.killbill.billing.catalog.api.Product;
 import org.killbill.billing.catalog.api.ProductCategory;
+import org.killbill.billing.catalog.api.StaticCatalog;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.entitlement.api.Entitlement.EntitlementSourceType;
 import org.killbill.billing.entitlement.api.Entitlement.EntitlementState;
 import org.killbill.billing.entitlement.api.EntitlementSpecifier;
 import org.killbill.billing.subscription.api.SubscriptionBase;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseApiException;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseTransition;
+import org.killbill.billing.subscription.api.user.SubscriptionBillingEvent;
 import org.killbill.billing.util.callcontext.CallContext;
 import org.mockito.Mockito;
 
@@ -44,16 +47,19 @@ public class MockSubscription implements SubscriptionBase {
 
     private final UUID id;
     private final UUID bundleId;
+    private final String externalKey;
     private final EntitlementState state;
     private Plan plan;
     private final PlanPhase phase;
     private final DateTime startDate;
     private final DateTime firstRecurringNonZeroChargeDate;
     private SubscriptionBase sub;
+    private BillingAlignment billingAlignment;
 
-    public MockSubscription(final UUID id, final UUID bundleId, final Plan plan, final DateTime startDate, final DateTime firstRecurringNonZeroChargeDate) {
+    public MockSubscription(final UUID id, final UUID bundleId, final String externalKey, final Plan plan, final DateTime startDate, final DateTime firstRecurringNonZeroChargeDate) {
         this.id = id;
         this.bundleId = bundleId;
+        this.externalKey = externalKey;
         this.state = EntitlementState.ACTIVE;
         this.plan = plan;
         this.phase = null;
@@ -73,9 +79,9 @@ public class MockSubscription implements SubscriptionBase {
     }
 
     @Override
-    public boolean cancelWithPolicy(BillingActionPolicy policy, int accountBillCycleDayLocal, CallContext context)
+    public boolean cancelWithPolicy(final BillingActionPolicy policy, final CallContext context)
             throws SubscriptionBaseApiException {
-        return sub.cancelWithPolicy(policy, accountBillCycleDayLocal, context);
+        return sub.cancelWithPolicy(policy, context);
     }
 
     @Override
@@ -125,6 +131,11 @@ public class MockSubscription implements SubscriptionBase {
     }
 
     @Override
+    public String getExternalKey() {
+        return externalKey;
+    }
+
+    @Override
     public EntitlementState getState() {
         return state;
     }
@@ -162,6 +173,20 @@ public class MockSubscription implements SubscriptionBase {
     @Override
     public DateTime getDateOfFirstRecurringNonZeroCharge() {
         return firstRecurringNonZeroChargeDate;
+    }
+
+    @Override
+    public List<SubscriptionBillingEvent> getSubscriptionBillingEvents(final VersionedCatalog publicCatalog) throws SubscriptionBaseApiException {
+        return null;
+    }
+
+    @Override
+    public BillingAlignment getBillingAlignment(final PlanPhaseSpecifier spec, final DateTime transitionTime, final VersionedCatalog publicCatalog) throws SubscriptionBaseApiException {
+        return billingAlignment;
+    }
+
+    public void setBillingAlignment(final BillingAlignment billingAlignment) {
+        this.billingAlignment = billingAlignment;
     }
 
     @Override

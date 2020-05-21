@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -81,7 +81,7 @@ public class DefaultAccountDao extends EntityDaoBase<AccountModelDao, Account, A
     @Inject
     public DefaultAccountDao(final IDBI dbi, @Named(MAIN_RO_IDBI_NAMED) final IDBI roDbi, final PersistentBus eventBus, final Clock clock, final CacheControllerDispatcher cacheControllerDispatcher,
                              final InternalCallContextFactory internalCallContextFactory, final NonEntityDao nonEntityDao, final AuditDao auditDao) {
-        super(new EntitySqlDaoTransactionalJdbiWrapper(dbi, roDbi, clock, cacheControllerDispatcher, nonEntityDao, internalCallContextFactory), AccountSqlDao.class);
+        super(nonEntityDao, cacheControllerDispatcher, new EntitySqlDaoTransactionalJdbiWrapper(dbi, roDbi, clock, cacheControllerDispatcher, nonEntityDao, internalCallContextFactory), AccountSqlDao.class);
         this.accountImmutableCacheController = cacheControllerDispatcher.getCacheController(CacheType.ACCOUNT_IMMUTABLE);
         this.eventBus = eventBus;
         this.internalCallContextFactory = internalCallContextFactory;
@@ -197,7 +197,7 @@ public class DefaultAccountDao extends EntityDaoBase<AccountModelDao, Account, A
     }
 
     @Override
-    public void update(final AccountModelDao specifiedAccount, final InternalCallContext context) throws AccountApiException {
+    public void update(final AccountModelDao specifiedAccount, final boolean treatNullValueAsReset, final InternalCallContext context) throws AccountApiException {
         transactionalSqlDao.execute(false, AccountApiException.class, new EntitySqlDaoTransactionWrapper<Void>() {
             @Override
             public Void inTransaction(final EntitySqlDaoWrapperFactory entitySqlDaoWrapperFactory) throws EventBusException, AccountApiException {
@@ -207,6 +207,13 @@ public class DefaultAccountDao extends EntityDaoBase<AccountModelDao, Account, A
                 final AccountModelDao currentAccount = transactional.getById(accountId.toString(), context);
                 if (currentAccount == null) {
                     throw new AccountApiException(ErrorCode.ACCOUNT_DOES_NOT_EXIST_FOR_ID, accountId);
+                }
+
+                specifiedAccount.validateAccountUpdateInput(currentAccount, treatNullValueAsReset);
+
+                if (!treatNullValueAsReset) {
+                    // Set unspecified (null) fields to their current values
+                    specifiedAccount.mergeWithDelegate(currentAccount);
                 }
 
                 transactional.update(specifiedAccount, context);

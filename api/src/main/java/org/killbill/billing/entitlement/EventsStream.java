@@ -38,6 +38,8 @@ public interface EventsStream {
 
     UUID getEntitlementId();
 
+    String getExternalKey();
+
     EntitlementState getEntitlementState();
 
     LocalDate getEntitlementEffectiveStartDate();
@@ -66,7 +68,7 @@ public interface EventsStream {
 
     boolean isBlockEntitlement(final DateTime effectiveDate);
 
-    int getDefaultBillCycleDayLocal();
+    Integer getDefaultBillCycleDayLocal();
 
     Collection<BlockingState> getPendingEntitlementCancellationEvents();
 

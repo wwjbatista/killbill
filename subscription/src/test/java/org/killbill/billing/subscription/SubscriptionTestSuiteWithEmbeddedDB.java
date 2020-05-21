@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -18,6 +18,8 @@
 
 package org.killbill.billing.subscription;
 
+import java.util.Map;
+
 import javax.inject.Inject;
 
 import org.killbill.billing.GuicyKillbillTestSuiteWithEmbeddedDB;
@@ -26,7 +28,6 @@ import org.killbill.billing.account.api.AccountApiException;
 import org.killbill.billing.account.api.AccountData;
 import org.killbill.billing.account.api.AccountUserApi;
 import org.killbill.billing.api.TestApiListener;
-import org.killbill.billing.catalog.api.Catalog;
 import org.killbill.billing.catalog.api.CatalogService;
 import org.killbill.billing.lifecycle.api.BusService;
 import org.killbill.billing.platform.api.KillbillConfigSource;
@@ -36,13 +37,16 @@ import org.killbill.billing.subscription.api.timeline.SubscriptionBaseTimelineAp
 import org.killbill.billing.subscription.api.transfer.SubscriptionBaseTransferApi;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseBundle;
 import org.killbill.billing.subscription.api.user.TestSubscriptionHelper;
+import org.killbill.billing.subscription.catalog.DefaultSubscriptionCatalogApi;
+import org.killbill.billing.subscription.catalog.SubscriptionCatalog;
 import org.killbill.billing.subscription.engine.addon.AddonUtils;
 import org.killbill.billing.subscription.engine.dao.SubscriptionDao;
 import org.killbill.billing.subscription.glue.TestDefaultSubscriptionModuleWithEmbeddedDB;
+import org.killbill.billing.util.api.AuditUserApi;
+import org.killbill.billing.util.audit.dao.AuditDao;
 import org.killbill.billing.util.config.definition.SubscriptionConfig;
 import org.killbill.billing.util.dao.NonEntityDao;
 import org.killbill.bus.api.PersistentBus;
-import org.killbill.clock.ClockMock;
 import org.killbill.notificationq.api.NotificationQueueService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,17 +94,21 @@ public class SubscriptionTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteW
     protected TestApiListener testListener;
     @Inject
     protected SubscriptionTestInitializer subscriptionTestInitializer;
+    @Inject
+    protected AuditUserApi auditUserApi;
+    @Inject
+    protected AuditDao auditDao;
 
     @Inject
     protected NonEntityDao nonEntityDao;
 
-    protected Catalog catalog;
+    protected SubscriptionCatalog catalog;
     protected AccountData accountData;
     protected SubscriptionBaseBundle bundle;
 
     @Override
-    protected KillbillConfigSource getConfigSource() {
-        return getConfigSource("/subscription.properties");
+    protected KillbillConfigSource getConfigSource(final Map<String, String> extraProperties) {
+        return getConfigSource("/subscription.properties", extraProperties);
     }
 
     @BeforeClass(groups = "slow")
@@ -109,7 +117,7 @@ public class SubscriptionTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteW
             return;
         }
 
-        final Injector g = Guice.createInjector(Stage.PRODUCTION, new TestDefaultSubscriptionModuleWithEmbeddedDB(configSource));
+        final Injector g = Guice.createInjector(Stage.PRODUCTION, new TestDefaultSubscriptionModuleWithEmbeddedDB(configSource, clock));
         g.injectMembers(this);
     }
 
@@ -123,7 +131,7 @@ public class SubscriptionTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteW
         super.beforeMethod();
         subscriptionTestInitializer.startTestFramework(testListener, clock, busService, subscriptionBaseService);
 
-        this.catalog = subscriptionTestInitializer.initCatalog(catalogService, internalCallContext);
+        this.catalog = DefaultSubscriptionCatalogApi.wrapCatalog(subscriptionTestInitializer.initCatalog(catalogService, internalCallContext), clock);
         this.accountData = subscriptionTestInitializer.initAccountData(clock);
         final Account account = createAccount(accountData);
         final SubscriptionBaseBundle model = subscriptionTestInitializer.initBundle(account.getId(), subscriptionInternalApi, clock, internalCallContext);

@@ -47,6 +47,7 @@ import org.killbill.billing.invoice.api.Invoice;
 import org.killbill.billing.invoice.api.InvoiceItem;
 import org.killbill.billing.invoice.api.InvoiceItemType;
 import org.killbill.billing.invoice.api.InvoicePayment;
+import org.killbill.billing.invoice.model.CreditAdjInvoiceItem;
 import org.killbill.billing.invoice.model.ExternalChargeInvoiceItem;
 import org.killbill.billing.overdue.config.DefaultOverdueConfig;
 import org.killbill.billing.overdue.wrapper.OverdueWrapper;
@@ -69,7 +70,7 @@ import static org.testng.Assert.assertTrue;
 // - The payment retries
 // - The overdue notifications
 //
-
+// Flaky, see https://github.com/killbill/killbill/issues/782
 @Test(groups = "slow")
 public class TestOverdueIntegration extends TestOverdueBase {
 
@@ -122,7 +123,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         return configXml;
     }
 
-    @Test(groups = "slow", description = "Test overdue stages and return to clear prior to CTD")
+    @Test(groups = "slow", description = "Test overdue stages and return to clear prior to CTD", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStages1() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -211,7 +212,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         assertEquals(invoiceUserApi.getAccountBalance(account.getId(), callContext).compareTo(BigDecimal.ZERO), 0);
     }
 
-    @Test(groups = "slow", description = "Test overdue stages and return to clear on CTD")
+    @Test(groups = "slow", description = "Test overdue stages and return to clear on CTD", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStages2() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -311,7 +312,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         assertEquals(invoiceUserApi.getAccountBalance(account.getId(), callContext).compareTo(BigDecimal.ZERO), 0);
     }
 
-    @Test(groups = "slow", description = "Test overdue stages and return to clear after CTD")
+    @Test(groups = "slow", description = "Test overdue stages and return to clear after CTD", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStages3() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -414,7 +415,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
     // This test is similar to the previous one except that instead of moving the clock to check we will get the next invoice
     // at the end, we carry a change of plan.
     //
-    @Test(groups = "slow", description = "Test overdue stages and follow with an immediate change of plan")
+    @Test(groups = "slow", description = "Test overdue stages and follow with an immediate change of plan", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStagesFollowedWithImmediateChange1() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -504,7 +505,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         assertEquals(invoiceUserApi.getAccountBalance(account.getId(), callContext).compareTo(BigDecimal.ZERO), 0);
     }
 
-    @Test(groups = "slow", description = "Test overdue stages and follow with an immediate change of plan and use of credit")
+    @Test(groups = "slow", description = "Test overdue stages and follow with an immediate change of plan and use of credit", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStagesFollowedWithImmediateChange2() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -581,7 +582,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         assertEquals(invoiceUserApi.getAccountBalance(account.getId(), callContext).compareTo(new BigDecimal("-1464.66")), 0);
     }
 
-    @Test(groups = "slow", description = "Test overdue stages with missing payment method")
+    @Test(groups = "slow", description = "Test overdue stages with missing payment method", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStateIfNoPaymentMethod() throws Exception {
         // This test is similar to the previous one - but there is no default payment method on the account, so there
         // won't be any payment retry
@@ -680,7 +681,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         assertEquals(invoiceUserApi.getAccountBalance(account.getId(), callContext).compareTo(BigDecimal.ZERO), 0);
     }
 
-    @Test(groups = "slow", description = "Test overdue for draft external charge")
+    @Test(groups = "slow", description = "Test overdue for draft external charge", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testShouldNotBeInOverdueAfterDraftExternalCharge() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -716,10 +717,10 @@ public class TestOverdueIntegration extends TestOverdueBase {
         // We should still be clear
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
 
-        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).size(), 0);
+        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).size(), 0);
     }
 
-    @Test(groups = "slow", description = "Test overdue after refund with no adjustment")
+    @Test(groups = "slow", description = "Test overdue after refund with no adjustment", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testShouldBeInOverdueAfterRefundWithoutAdjustment() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -765,7 +766,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         checkChangePlanWithOverdueState(baseEntitlement, true, true);
     }
 
-    @Test(groups = "slow", description = "Test overdue after chargeback")
+    @Test(groups = "slow", description = "Test overdue after chargeback", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testShouldBeInOverdueAfterChargeback() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -816,7 +817,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
     }
 
-    @Test(groups = "slow", description = "Test overdue clear after external payment")
+    @Test(groups = "slow", description = "Test overdue clear after external payment", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStateShouldClearAfterExternalPayment() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -860,13 +861,13 @@ public class TestOverdueIntegration extends TestOverdueBase {
         // Pay the first one via an external payment - we should then be 5 days apart from the second invoice
         // (which is the earliest unpaid one) and hence come back to a clear state (see configuration)
         paymentPlugin.makeAllInvoicesFailWithError(false);
-        final Invoice firstNonZeroInvoice = invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).iterator().next();
+        final Invoice firstNonZeroInvoice = invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).iterator().next();
         createExternalPaymentAndCheckForCompletion(account, firstNonZeroInvoice, NextEvent.PAYMENT, NextEvent.INVOICE_PAYMENT, NextEvent.BLOCK);
         // We should be clear now
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
     }
 
-    @Test(groups = "slow", description = "Test overdue clear after item adjustment")
+    @Test(groups = "slow", description = "Test overdue clear after item adjustment", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStateShouldClearAfterCreditOrInvoiceItemAdjustment() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -909,7 +910,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         // We have two unpaid non-zero dollar invoices at this point
         // Adjust the first (and only) item of the first invoice - we should then be 5 days apart from the second invoice
         // (which is the earliest unpaid one) and hence come back to a clear state (see configuration)
-        final Invoice firstNonZeroInvoice = invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).iterator().next();
+        final Invoice firstNonZeroInvoice = invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).iterator().next();
         fullyAdjustInvoiceItemAndCheckForCompletion(account, firstNonZeroInvoice, 1, NextEvent.BLOCK, NextEvent.INVOICE_ADJUSTMENT);
         // We should be clear now
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
@@ -954,7 +955,6 @@ public class TestOverdueIntegration extends TestOverdueBase {
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
     }
 
-    // Flaky, see https://github.com/killbill/killbill/issues/782
     @Test(groups = "slow", description = "Test overdue state with number of unpaid invoices condition", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStateWithNumberOfUnpaidInvoicesCondition() throws Exception {
         // 2012-05-01T00:03:42.000Z
@@ -973,14 +973,14 @@ public class TestOverdueIntegration extends TestOverdueBase {
         // 2012-05-31 => DAY 30 have to get out of trial before first payment
         addMonthsAndCheckForCompletion(1, NextEvent.PHASE, NextEvent.INVOICE, NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR);
         // Verify that number of unpaid invoices is 1
-        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).size(), 1);
+        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).size(), 1);
         // Should still be in clear state
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
 
         // Add 1 month
         addMonthsAndCheckForCompletion(1, NextEvent.INVOICE, NextEvent.BLOCK, NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR, NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR);
         // Verify that number of unpaid invoices is 2
-        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).size(), 2);
+        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).size(), 2);
         // Now we should be in OD1
         checkODState("OD1");
 
@@ -989,7 +989,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
                                        NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR,
                                        NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR);
         // Verify that number of unpaid invoices is 3
-        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).size(), 3);
+        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).size(), 3);
         // Now we should be in OD2
         checkODState("OD2");
 
@@ -999,7 +999,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
                                        NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR,
                                        NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR);
         // Verify that number of unpaid invoices is 4
-        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).size(), 4);
+        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).size(), 4);
         // We should still be in OD2
         checkODState("OD2");
 
@@ -1010,7 +1010,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
                                        NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR,
                                        NextEvent.PAYMENT_ERROR, NextEvent.INVOICE_PAYMENT_ERROR, NextEvent.TAG,  NextEvent.BLOCK);
         // Verify that number of unpaid invoices is 5
-        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext).size(), 5);
+        Assert.assertEquals(invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext).size(), 5);
         // Now we should be in OD3
         checkODState("OD3");
 
@@ -1027,7 +1027,6 @@ public class TestOverdueIntegration extends TestOverdueBase {
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
     }
 
-    // Flaky, see https://github.com/killbill/killbill/issues/782
     @Test(groups = "slow", description = "Test overdue state with total unpaid invoice balance condition", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueStateWithTotalUnpaidInvoiceBalanceCondition() throws Exception {
         // 2012-05-01T00:03:42.000Z
@@ -1101,9 +1100,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
         checkODState(OverdueWrapper.CLEAR_STATE_NAME);
     }
 
-
-
-    @Test(groups = "slow", description = "Test clearing balance with credit also clears overdue state")
+    @Test(groups = "slow", description = "Test clearing balance with credit also clears overdue state", retryAnalyzer = FlakyRetryAnalyzer.class)
     public void testOverdueClearWithCredit() throws Exception {
         // 2012-05-01T00:03:42.000Z
         clock.setTime(new DateTime(2012, 5, 1, 0, 3, 42, 0));
@@ -1145,8 +1142,11 @@ public class TestOverdueIntegration extends TestOverdueBase {
 
         final BigDecimal accountBalance = invoiceUserApi.getAccountBalance(account.getId(), callContext);
 
-        busHandler.pushExpectedEvents(NextEvent.INVOICE, NextEvent.BLOCK);
-        invoiceUserApi.insertCredit(account.getId(), accountBalance, new LocalDate(2012, 06, 30), account.getCurrency(), true, "credit invoice", null, null, callContext);
+        // We rebalance CBA on the last 2 unpaid invoices and therefore we expect 2 INVOICE_ADJUSTMENT events
+        busHandler.pushExpectedEvents(NextEvent.INVOICE, NextEvent.INVOICE_ADJUSTMENT, NextEvent.INVOICE_ADJUSTMENT, NextEvent.BLOCK);
+
+        final InvoiceItem inputCredit = new CreditAdjInvoiceItem(null, account.getId(), new LocalDate(2012, 06, 30), "credit invoice", accountBalance, account.getCurrency(), null);
+        invoiceUserApi.insertCredits(account.getId(), new LocalDate(2012, 06, 30), ImmutableList.of(inputCredit), true, null, callContext);
         assertListenerStatus();
 
     }
@@ -1183,7 +1183,7 @@ public class TestOverdueIntegration extends TestOverdueBase {
     }
 
     private List<Invoice> getUnpaidInvoicesOrderFromRecent() {
-        final Collection<Invoice> invoices = invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), clock.getUTCToday(), callContext);
+        final Collection<Invoice> invoices = invoiceUserApi.getUnpaidInvoicesByAccountId(account.getId(), null, clock.getUTCToday(), callContext);
         // Sort in reverse order to first pay most recent invoice-- that way overdue state may only flip when we reach the last one.
         final List<Invoice> sortedInvoices = new LinkedList<Invoice>(invoices);
         Collections.sort(sortedInvoices, new Comparator<Invoice>() {

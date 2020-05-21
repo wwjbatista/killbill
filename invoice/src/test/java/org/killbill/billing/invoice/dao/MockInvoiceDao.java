@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -25,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.joda.time.LocalDate;
@@ -37,6 +38,9 @@ import org.killbill.billing.invoice.api.Invoice;
 import org.killbill.billing.invoice.api.InvoiceApiException;
 import org.killbill.billing.invoice.api.InvoiceStatus;
 import org.killbill.billing.invoice.api.user.DefaultInvoiceCreationEvent;
+import org.killbill.billing.junction.BillingEventSet;
+import org.killbill.billing.util.api.AuditLevel;
+import org.killbill.billing.util.audit.AuditLogWithHistory;
 import org.killbill.billing.util.entity.DefaultPagination;
 import org.killbill.billing.util.entity.Pagination;
 import org.killbill.billing.util.entity.dao.MockEntityDaoBase;
@@ -62,7 +66,11 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
 
     @Override
     public void createInvoice(final InvoiceModelDao invoice,
-                              final FutureAccountNotifications callbackDateTimePerSubscriptions, final InternalCallContext context) {
+                              final BillingEventSet billingEvents,
+                              final Set<InvoiceTrackingModelDao> trackingIds,
+                              final FutureAccountNotifications callbackDateTimePerSubscriptions,
+                              final ExistingInvoiceMetadata existingInvoiceMetadata,
+                              final InternalCallContext context) {
         synchronized (monitor) {
             storeInvoice(invoice, context);
         }
@@ -81,7 +89,10 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public List<InvoiceItemModelDao> createInvoices(final List<InvoiceModelDao> invoiceModelDaos, final InternalCallContext context) {
+    public List<InvoiceItemModelDao> createInvoices(final List<InvoiceModelDao> invoiceModelDaos,
+                                                    final BillingEventSet billingEvents,
+                                                    final Set<InvoiceTrackingModelDao> trackingIds,
+                                                    final InternalCallContext context) {
         synchronized (monitor) {
             final List<InvoiceItemModelDao> createdItems = new LinkedList<InvoiceItemModelDao>();
             for (final InvoiceModelDao invoice : invoiceModelDaos) {
@@ -155,7 +166,7 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public List<InvoiceModelDao> getInvoicesByAccount(final Boolean includeVoidedInvoices, final LocalDate fromDate, final InternalTenantContext context) {
+    public List<InvoiceModelDao> getInvoicesByAccount(final Boolean includeVoidedInvoices, final LocalDate fromDate, final LocalDate upToDate, final InternalTenantContext context) {
         final List<InvoiceModelDao> invoicesForAccount = new ArrayList<InvoiceModelDao>();
         synchronized (monitor) {
             final UUID accountId = accountRecordIds.inverse().get(context.getAccountRecordId());
@@ -269,7 +280,12 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public void notifyOfPaymentCompletion(final InvoicePaymentModelDao invoicePayment, final InternalCallContext context) {
+    public InvoicePaymentModelDao getInvoicePayment(final UUID invoicePaymentId, final InternalTenantContext internalTenantContext) {
+        return null;
+    }
+
+    @Override
+    public void notifyOfPaymentCompletion(final InvoicePaymentModelDao invoicePayment, final UUID paymentAttemptId, final InternalCallContext context) {
         synchronized (monitor) {
             payments.put(invoicePayment.getId(), invoicePayment);
         }
@@ -293,7 +309,7 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public List<InvoiceModelDao> getUnpaidInvoicesByAccountId(final UUID accountId, final LocalDate upToDate, final InternalTenantContext context) {
+    public List<InvoiceModelDao> getUnpaidInvoicesByAccountId(final UUID accountId, final LocalDate startDate, final LocalDate upToDate, final InternalTenantContext context) {
         final List<InvoiceModelDao> unpaidInvoices = new ArrayList<InvoiceModelDao>();
 
         for (final InvoiceModelDao invoice : getAll(context)) {
@@ -321,12 +337,12 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public InvoicePaymentModelDao postChargeback(final UUID invoicePaymentId, final String chargebackTransactionExternalKey, final BigDecimal amount, final Currency currency, final InternalCallContext context) throws InvoiceApiException {
+    public InvoicePaymentModelDao postChargeback(final UUID invoicePaymentId, final UUID paymentAttemptId, final String chargebackTransactionExternalKey, final BigDecimal amount, final Currency currency, final InternalCallContext context) throws InvoiceApiException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public InvoicePaymentModelDao postChargebackReversal(final UUID paymentId, final String chargebackTransactionExternalKey, final InternalCallContext context) throws InvoiceApiException {
+    public InvoicePaymentModelDao postChargebackReversal(final UUID paymentId, final UUID paymentAttemptId, final String chargebackTransactionExternalKey, final InternalCallContext context) throws InvoiceApiException {
         throw new UnsupportedOperationException();
     }
 
@@ -382,7 +398,7 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public InvoicePaymentModelDao createRefund(final UUID paymentId, final BigDecimal amount, final boolean isInvoiceAdjusted,
+    public InvoicePaymentModelDao createRefund(final UUID paymentId, final UUID paymentAttemptId, final BigDecimal amount, final boolean isInvoiceAdjusted,
                                                final Map<UUID, BigDecimal> invoiceItemIdsWithAmounts, final String transactionExternalKey,
                                                final InternalCallContext context)
             throws InvoiceApiException {
@@ -395,7 +411,7 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     }
 
     @Override
-    public void notifyOfPaymentInit(final InvoicePaymentModelDao invoicePayment, final InternalCallContext context) {
+    public void notifyOfPaymentInit(final InvoicePaymentModelDao invoicePayment, final UUID paymentAttemptId, final InternalCallContext context) {
         synchronized (monitor) {
             payments.put(invoicePayment.getId(), invoicePayment);
         }
@@ -434,5 +450,25 @@ public class MockInvoiceDao extends MockEntityDaoBase<InvoiceModelDao, Invoice, 
     @Override
     public List<InvoiceItemModelDao> getInvoiceItemsByParentInvoice(final UUID parentInvoiceId, final InternalTenantContext context) throws InvoiceApiException {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<InvoiceTrackingModelDao> getTrackingsByDateRange(final LocalDate startDate, final LocalDate endDate, final InternalCallContext context) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<AuditLogWithHistory> getInvoiceAuditLogsWithHistoryForId(final UUID invoiceId, final AuditLevel auditLevel, final InternalTenantContext context) {
+        return null;
+    }
+
+    @Override
+    public List<AuditLogWithHistory> getInvoiceItemAuditLogsWithHistoryForId(final UUID invoiceItemId, final AuditLevel auditLevel, final InternalTenantContext context) {
+        return null;
+    }
+
+    @Override
+    public List<AuditLogWithHistory> getInvoicePaymentAuditLogsWithHistoryForId(final UUID invoicePaymentId, final AuditLevel auditLevel, final InternalTenantContext context) {
+        return null;
     }
 }

@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2016 Groupon, Inc
- * Copyright 2014-2016 The Billing Project, LLC
+ * Copyright 2014-2018 Groupon, Inc
+ * Copyright 2014-2018 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -18,6 +18,8 @@
 
 package org.killbill.billing.entitlement;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.apache.shiro.SecurityUtils;
@@ -36,9 +38,10 @@ import org.killbill.billing.account.api.AccountInternalApi;
 import org.killbill.billing.account.api.AccountUserApi;
 import org.killbill.billing.api.TestApiListener;
 import org.killbill.billing.catalog.DefaultCatalogService;
-import org.killbill.billing.catalog.api.Catalog;
 import org.killbill.billing.catalog.api.CatalogService;
 import org.killbill.billing.catalog.api.Currency;
+import org.killbill.billing.catalog.api.StaticCatalog;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.entitlement.api.EntitlementApi;
 import org.killbill.billing.entitlement.api.SubscriptionApi;
 import org.killbill.billing.entitlement.dao.BlockingStateDao;
@@ -121,11 +124,11 @@ public class EntitlementTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteWi
     @Inject
     protected NonEntityDao nonEntityDao;
 
-    protected Catalog catalog;
+    protected VersionedCatalog catalog;
 
     @Override
-    protected KillbillConfigSource getConfigSource() {
-        return getConfigSource("/entitlement.properties");
+    protected KillbillConfigSource getConfigSource(final Map<String, String> extraProperties) {
+        return getConfigSource("/entitlement.properties", extraProperties);
     }
 
     @BeforeClass(groups = "slow")
@@ -134,7 +137,7 @@ public class EntitlementTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteWi
             return;
         }
 
-        final Injector injector = Guice.createInjector(Stage.PRODUCTION, new TestEntitlementModuleWithEmbeddedDB(configSource));
+        final Injector injector = Guice.createInjector(Stage.PRODUCTION, new TestEntitlementModuleWithEmbeddedDB(configSource, clock));
         injector.injectMembers(this);
     }
 
@@ -155,7 +158,6 @@ public class EntitlementTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteWi
     private void login(final String username) {
         securityApi.login(username, "password");
     }
-
 
     protected void configureShiro() {
         final Ini config = new Ini();
@@ -188,10 +190,10 @@ public class EntitlementTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteWi
         stopTestFramework(testListener, busService, subscriptionBaseService, entitlementService);
     }
 
-    private Catalog initCatalog(final CatalogService catalogService) throws Exception {
+    private VersionedCatalog initCatalog(final CatalogService catalogService) throws Exception {
 
         ((DefaultCatalogService) catalogService).loadCatalog();
-        final Catalog catalog = catalogService.getFullCatalog(true, true, internalCallContext);
+        final VersionedCatalog catalog = catalogService.getFullCatalog(true, true, internalCallContext);
         assertNotNull(catalog);
         return catalog;
     }
@@ -234,15 +236,13 @@ public class EntitlementTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteWi
     }
 
     private void resetClockToStartOfTest(final ClockMock clock) {
-        clock.resetDeltaFromReality();
-
         // Date at which all tests start-- we create the date object here after the system properties which set the JVM in UTC have been set.
         final DateTime testStartDate = new DateTime(2012, 5, 7, 0, 3, 42, 0);
         clock.setDeltaFromReality(testStartDate.getMillis() - clock.getUTCNow().getMillis());
     }
 
     private void startBusAndRegisterListener(final BusService busService, final TestApiListener testListener) throws Exception {
-        busService.getBus().start();
+        busService.getBus().startQueue();
         busService.getBus().register(testListener);
     }
 
@@ -260,7 +260,7 @@ public class EntitlementTestSuiteWithEmbeddedDB extends GuicyKillbillTestSuiteWi
 
     private void stopBusAndUnregisterListener(final BusService busService, final TestApiListener testListener) throws Exception {
         busService.getBus().unregister(testListener);
-        busService.getBus().stop();
+        busService.getBus().stopQueue();
     }
 
     private void stopSubscriptionService(final SubscriptionBaseService subscriptionBaseService) throws Exception {

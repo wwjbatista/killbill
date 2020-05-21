@@ -70,6 +70,15 @@ public class DefaultAccountCreationEvent extends BusEventBase implements Account
     }
 
     @Override
+    public String toString() {
+        final StringBuffer sb = new StringBuffer("DefaultAccountCreationEvent{");
+        sb.append("id=").append(id);
+        sb.append(", data=").append(data);
+        sb.append('}');
+        return sb.toString();
+    }
+
+    @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
@@ -321,7 +330,7 @@ public class DefaultAccountCreationEvent extends BusEventBase implements Account
 
         @Override
         public DateTime getReferenceTime() {
-            return DATE_TIME_FORMATTER.parseDateTime(referenceTime);
+            return referenceTime != null ?  DATE_TIME_FORMATTER.parseDateTime(referenceTime) : null;
         }
 
         @Override

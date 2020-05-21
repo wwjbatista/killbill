@@ -1,7 +1,9 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
+ * Copyright 2014-2018 Groupon, Inc
+ * Copyright 2014-2018 The Billing Project, LLC
  *
- * Ning licenses this file to you under the Apache License, version 2.0
+ * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
  * License.  You may obtain a copy of the License at:
  *
@@ -16,6 +18,10 @@
 
 package org.killbill.billing.catalog.rules;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.net.URI;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -42,7 +48,7 @@ import org.killbill.xmlloader.ValidatingConfig;
 import org.killbill.xmlloader.ValidationErrors;
 
 @XmlAccessorType(XmlAccessType.NONE)
-public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCatalog> implements CaseChange {
+public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCatalog> implements CaseChange, Externalizable {
 
     @XmlElement(required = false)
     protected PhaseType phaseType;
@@ -80,23 +86,21 @@ public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCa
     public T getResult(final PlanPhaseSpecifier from,
                        final PlanSpecifier to, final StaticCatalog catalog) throws CatalogApiException {
 
-
-
         final Product inFromProduct;
         final BillingPeriod inFromBillingPeriod;
         final ProductCategory inFromProductCategory;
         final PriceList inFromPriceList;
         if (from.getPlanName() != null) {
-            final Plan plan = catalog.findCurrentPlan(from.getPlanName());
+            final Plan plan = catalog.findPlan(from.getPlanName());
             inFromProduct = plan.getProduct();
             inFromBillingPeriod = plan.getRecurringBillingPeriod();
             inFromProductCategory = plan.getProduct().getCategory();
-            inFromPriceList = catalog.findCurrentPricelist(plan.getPriceListName());
+            inFromPriceList = plan.getPriceList();
         } else {
-            inFromProduct = catalog.findCurrentProduct(from.getProductName());
+            inFromProduct = catalog.findProduct(from.getProductName());
             inFromBillingPeriod = from.getBillingPeriod();
             inFromProductCategory = inFromProduct.getCategory();
-            inFromPriceList = from.getPriceListName() != null ? catalog.findCurrentPricelist(from.getPriceListName()) : null;
+            inFromPriceList = from.getPriceListName() != null ? catalog.findPriceList(from.getPriceListName()) : null;
         }
 
         final Product inToProduct;
@@ -104,18 +108,17 @@ public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCa
         final ProductCategory inToProductCategory;
         final PriceList inToPriceList;
         if (to.getPlanName() != null) {
-            final Plan plan = catalog.findCurrentPlan(to.getPlanName());
+            final Plan plan = catalog.findPlan(to.getPlanName());
             inToProduct = plan.getProduct();
             inToBillingPeriod = plan.getRecurringBillingPeriod();
             inToProductCategory = plan.getProduct().getCategory();
-            inToPriceList = catalog.findCurrentPricelist(plan.getPriceListName());
+            inToPriceList =  plan.getPriceList();
         } else {
-            inToProduct = catalog.findCurrentProduct(to.getProductName());
+            inToProduct = catalog.findProduct(to.getProductName());
             inToBillingPeriod = to.getBillingPeriod();
             inToProductCategory = inToProduct.getCategory();
-            inToPriceList = to.getPriceListName() != null ? catalog.findCurrentPricelist(to.getPriceListName()) : null;
+            inToPriceList = to.getPriceListName() != null ? catalog.findPriceList(to.getPriceListName()) : null;
         }
-
 
         if (
                 (phaseType == null || from.getPhaseType() == phaseType) &&
@@ -127,7 +130,7 @@ public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCa
                 (this.toBillingPeriod == null || this.toBillingPeriod.equals(inToBillingPeriod)) &&
                 (fromPriceList == null || fromPriceList.equals(inFromPriceList)) &&
                 (toPriceList == null || toPriceList.equals(inToPriceList))
-                ) {
+        ) {
             return getResult();
         }
         return null;
@@ -146,6 +149,11 @@ public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCa
         return null;
 
     }
+    @Override
+    public StaticCatalog getCatalog() {
+        return root;
+    }
+
 
     @Override
     public ValidationErrors validate(final StandaloneCatalog catalog, final ValidationErrors errors) {
@@ -153,8 +161,8 @@ public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCa
     }
 
     @Override
-    public void initialize(final StandaloneCatalog catalog, final URI sourceURI) {
-        super.initialize(catalog, sourceURI);
+    public void initialize(final StandaloneCatalog catalog) {
+        super.initialize(catalog);
         CatalogSafetyInitializer.initializeNonRequiredNullFieldsWithDefaultValue(this);
     }
 
@@ -317,5 +325,46 @@ public abstract class DefaultCaseChange<T> extends ValidatingConfig<StandaloneCa
                ", toBillingPeriod=" + toBillingPeriod +
                ", toPriceList=" + toPriceList +
                '}';
+    }
+
+    @Override
+    public void writeExternal(final ObjectOutput out) throws IOException {
+        out.writeBoolean(phaseType != null);
+        if (phaseType != null) {
+            out.writeUTF(phaseType.name());
+        }
+        out.writeObject(fromProduct);
+        out.writeBoolean(fromProductCategory != null);
+        if (fromProductCategory != null) {
+            out.writeUTF(fromProductCategory.name());
+        }
+        out.writeBoolean(fromBillingPeriod != null);
+        if (fromBillingPeriod != null) {
+            out.writeUTF(fromBillingPeriod.name());
+        }
+        out.writeObject(fromPriceList);
+        out.writeObject(toProduct);
+        out.writeBoolean(toProductCategory != null);
+        if (toProductCategory != null) {
+            out.writeUTF(toProductCategory.name());
+        }
+        out.writeBoolean(toBillingPeriod != null);
+        if (toBillingPeriod != null) {
+            out.writeUTF(toBillingPeriod.name());
+        }
+        out.writeObject(toPriceList);
+    }
+
+    @Override
+    public void readExternal(final ObjectInput in) throws IOException, ClassNotFoundException {
+        this.phaseType = in.readBoolean() ? PhaseType.valueOf(in.readUTF()) : null;
+        this.fromProduct = (DefaultProduct) in.readObject();
+        this.fromProductCategory = in.readBoolean() ? ProductCategory.valueOf(in.readUTF()) : null;
+        this.fromBillingPeriod = in.readBoolean() ? BillingPeriod.valueOf(in.readUTF()) : null;
+        this.fromPriceList = (DefaultPriceList) in.readObject();
+        this.toProduct = (DefaultProduct) in.readObject();
+        this.toProductCategory = in.readBoolean() ? ProductCategory.valueOf(in.readUTF()) : null;
+        this.toBillingPeriod = in.readBoolean() ? BillingPeriod.valueOf(in.readUTF()) : null;
+        this.toPriceList = (DefaultPriceList) in.readObject();
     }
 }

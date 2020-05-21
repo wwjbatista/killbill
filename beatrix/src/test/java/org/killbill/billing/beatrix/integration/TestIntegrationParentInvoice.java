@@ -46,10 +46,12 @@ import org.killbill.billing.invoice.api.InvoiceApiException;
 import org.killbill.billing.invoice.api.InvoiceItem;
 import org.killbill.billing.invoice.api.InvoiceItemType;
 import org.killbill.billing.invoice.api.InvoiceStatus;
+import org.killbill.billing.invoice.model.CreditAdjInvoiceItem;
 import org.killbill.billing.invoice.notification.ParentInvoiceCommitmentNotifier;
 import org.killbill.billing.payment.api.Payment;
 import org.killbill.billing.payment.api.PaymentApiException;
 import org.killbill.billing.payment.api.PluginProperty;
+import org.killbill.billing.platform.api.KillbillService.KILLBILL_SERVICES;
 import org.killbill.notificationq.api.NotificationEvent;
 import org.killbill.notificationq.api.NotificationEventWithMetadata;
 import org.killbill.notificationq.api.NotificationQueue;
@@ -97,7 +99,7 @@ public class TestIntegrationParentInvoice extends TestIntegrationBase {
         assertEquals(parentInvoice.getBalance().compareTo(BigDecimal.ZERO), 0);
 
         // Verify the notification exists and the efective time matches the default configuration '23:59:59'
-        final NotificationQueue notificationQueue = notificationQueueService.getNotificationQueue(DefaultInvoiceService.INVOICE_SERVICE_NAME, ParentInvoiceCommitmentNotifier.PARENT_INVOICE_COMMITMENT_NOTIFIER_QUEUE);
+        final NotificationQueue notificationQueue = notificationQueueService.getNotificationQueue(KILLBILL_SERVICES.INVOICE_SERVICE.getServiceName(), ParentInvoiceCommitmentNotifier.PARENT_INVOICE_COMMITMENT_NOTIFIER_QUEUE);
         final Iterable<NotificationEventWithMetadata<NotificationEvent>> events = notificationQueue.getFutureNotificationForSearchKey2(new DateTime(2050, 5, 15, 0, 0, 0, 0, testTimeZone), internalCallContext.getTenantRecordId());
         //
         final Iterator<NotificationEventWithMetadata<NotificationEvent>> metadataEventIterator = events.iterator();
@@ -261,8 +263,9 @@ public class TestIntegrationParentInvoice extends TestIntegrationBase {
         assertListenerStatus();
 
         // add credit to child account when invoice is still unpaid
-        busHandler.pushExpectedEvents(NextEvent.INVOICE);
-        invoiceUserApi.insertCredit(childAccount.getId(), BigDecimal.TEN, clock.getUTCToday(), Currency.USD, true, "test", null, null, callContext);
+        busHandler.pushExpectedEvents(NextEvent.INVOICE, NextEvent.INVOICE_ADJUSTMENT);
+        final InvoiceItem inputCredit = new CreditAdjInvoiceItem(null, childAccount.getId(), clock.getUTCToday(), "some description", BigDecimal.TEN, Currency.USD, null);
+        invoiceUserApi.insertCredits(childAccount.getId(), clock.getUTCToday(), ImmutableList.of(inputCredit), true, null, callContext);
         assertListenerStatus();
 
         final List<Invoice> childInvoices = invoiceUserApi.getInvoicesByAccount(childAccount.getId(), false, false, callContext);
@@ -343,7 +346,9 @@ public class TestIntegrationParentInvoice extends TestIntegrationBase {
 
         // add credit to child account after invoice has been paid
         busHandler.pushExpectedEvents(NextEvent.INVOICE);
-        invoiceUserApi.insertCredit(childAccount.getId(), BigDecimal.TEN, clock.getUTCToday(), Currency.USD, true, "test", null, null, callContext);
+        final InvoiceItem inputCredit = new CreditAdjInvoiceItem(null, childAccount.getId(), clock.getUTCToday(), "some description", BigDecimal.TEN, Currency.USD, null);
+        invoiceUserApi.insertCredits(childAccount.getId(), clock.getUTCToday(), ImmutableList.of(inputCredit), true, null, callContext);
+
         assertListenerStatus();
 
         List<Invoice> childInvoices = invoiceUserApi.getInvoicesByAccount(childAccount.getId(), false, false, callContext);
@@ -711,7 +716,7 @@ public class TestIntegrationParentInvoice extends TestIntegrationBase {
         assertEquals(parentInvoice.getInvoiceItems().get(0).getAmount().compareTo(BigDecimal.valueOf(249.95)), 0);
 
         // cancel subscription
-        busHandler.pushExpectedEvents(NextEvent.CANCEL, NextEvent.BLOCK, NextEvent.INVOICE);
+        busHandler.pushExpectedEvents(NextEvent.CANCEL, NextEvent.BLOCK, NextEvent.INVOICE, NextEvent.INVOICE_ADJUSTMENT);
         baseEntitlementChild.cancelEntitlementWithDateOverrideBillingPolicy(clock.getToday(childAccount.getTimeZone()), BillingActionPolicy.IMMEDIATE, null, callContext);
         assertListenerStatus();
 
@@ -983,8 +988,8 @@ public class TestIntegrationParentInvoice extends TestIntegrationBase {
         final Account childAccount = createAccountWithNonOsgiPaymentMethod(getChildAccountData(billingDay, parentAccount.getId(), true));
 
         busHandler.pushExpectedEvents(NextEvent.INVOICE);
-        invoiceUserApi.insertCredit(childAccount.getId(), new BigDecimal("250"), new LocalDate(clock.getUTCNow(), childAccount.getTimeZone()), childAccount.getCurrency(),
-                                    true, null, null, null, callContext);
+        final InvoiceItem inputCredit = new CreditAdjInvoiceItem(null, childAccount.getId(), new LocalDate(clock.getUTCNow(), childAccount.getTimeZone()), "some description", new BigDecimal("250"), Currency.USD, null);
+        invoiceUserApi.insertCredits(childAccount.getId(), new LocalDate(clock.getUTCNow(), childAccount.getTimeZone()), ImmutableList.of(inputCredit), true, null, callContext);
         assertListenerStatus();
 
         BigDecimal childAccountCBA = invoiceUserApi.getAccountCBA(childAccount.getId(), callContext);

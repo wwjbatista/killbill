@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -43,6 +43,7 @@ import org.killbill.billing.callcontext.MutableInternalCallContext;
 import org.killbill.billing.catalog.MockPlan;
 import org.killbill.billing.catalog.MockPlanPhase;
 import org.killbill.billing.catalog.api.BillingActionPolicy;
+import org.killbill.billing.catalog.api.BillingAlignment;
 import org.killbill.billing.catalog.api.BillingMode;
 import org.killbill.billing.catalog.api.BillingPeriod;
 import org.killbill.billing.catalog.api.Currency;
@@ -316,11 +317,7 @@ public class TestInvoiceHelper {
     }
 
     public void createPayment(final InvoicePayment invoicePayment, final InternalCallContext internalCallContext) {
-        try {
-            invoicePaymentSqlDao.create(new InvoicePaymentModelDao(invoicePayment), internalCallContext);
-        } catch (final EntityPersistenceException e) {
-            Assert.fail(e.getMessage());
-        }
+        invoicePaymentSqlDao.create(new InvoicePaymentModelDao(invoicePayment), internalCallContext);
     }
 
     public void verifyInvoice(final UUID invoiceId, final double balance, final double cbaAmount, final InternalTenantContext context) throws InvoiceApiException {
@@ -357,14 +354,25 @@ public class TestInvoiceHelper {
         Mockito.when(mockAccount.getTimeZone()).thenReturn(DateTimeZone.UTC);
         return new BillingEvent() {
             @Override
+            public UUID getSubscriptionId() {
+                return subscription.getId();
+            }
+
+            @Override
+            public UUID getBundleId() {
+                return subscription.getBundleId();
+            }
+
+            @Override
             public int getBillCycleDayLocal() {
                 return billCycleDayLocal;
             }
 
             @Override
-            public SubscriptionBase getSubscription() {
-                return subscription;
+            public BillingAlignment getBillingAlignment() {
+                return null;
             }
+
 
             @Override
             public DateTime getEffectiveDate() {
@@ -397,7 +405,7 @@ public class TestInvoiceHelper {
             }
 
             @Override
-            public BigDecimal getRecurringPrice(DateTime effectiveDate) {
+            public BigDecimal getRecurringPrice() {
                 return recurringPrice;
             }
 
@@ -428,8 +436,8 @@ public class TestInvoiceHelper {
 
             @Override
             public int compareTo(final BillingEvent e1) {
-                if (!getSubscription().getId().equals(e1.getSubscription().getId())) { // First order by subscription
-                    return getSubscription().getId().compareTo(e1.getSubscription().getId());
+                if (!getSubscriptionId().equals(e1.getSubscriptionId())) { // First order by subscription
+                    return getSubscriptionId().compareTo(e1.getSubscriptionId());
                 } else { // subscriptions are the same
                     if (!getEffectiveDate().equals(e1.getEffectiveDate())) { // Secondly order by date
                         return getEffectiveDate().compareTo(e1.getEffectiveDate());

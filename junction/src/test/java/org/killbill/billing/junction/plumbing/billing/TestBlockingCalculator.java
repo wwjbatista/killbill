@@ -20,10 +20,11 @@ package org.killbill.billing.junction.plumbing.billing;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -41,6 +42,7 @@ import org.killbill.billing.catalog.api.InternationalPrice;
 import org.killbill.billing.catalog.api.Plan;
 import org.killbill.billing.catalog.api.PlanPhase;
 import org.killbill.billing.catalog.api.Recurring;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.entitlement.api.BlockingState;
 import org.killbill.billing.entitlement.api.BlockingStateType;
 import org.killbill.billing.entitlement.dao.MockBlockingStateDao;
@@ -55,6 +57,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import static org.testng.Assert.assertEquals;
@@ -74,6 +77,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
     private SubscriptionBase subscription2;
     private SubscriptionBase subscription3;
     private SubscriptionBase subscription4;
+    private Map<UUID, List<SubscriptionBase>> subscriptionsForAccount;
+
+    private VersionedCatalog catalog;
 
     @BeforeMethod(groups = "fast")
     public void beforeMethod() throws Exception {
@@ -83,6 +89,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
 
         super.beforeMethod();
         account = Mockito.mock(Account.class);
+
+        subscriptionsForAccount = new HashMap<>();
+
         subscription1 = Mockito.mock(SubscriptionBase.class);
         subscription2 = Mockito.mock(SubscriptionBase.class);
         subscription3 = Mockito.mock(SubscriptionBase.class);
@@ -91,7 +100,17 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         Mockito.when(subscription1.getBundleId()).thenReturn(bundleId1);
         Mockito.when(subscription2.getBundleId()).thenReturn(bundleId1);
         Mockito.when(subscription3.getBundleId()).thenReturn(bundleId1);
+        final List<SubscriptionBase> bundleSubscriptions1 = new ArrayList<>();
+        bundleSubscriptions1.add(subscription1);
+        bundleSubscriptions1.add(subscription2);
+        bundleSubscriptions1.add(subscription3);
+        subscriptionsForAccount.put(bundleId1, bundleSubscriptions1);
+
         Mockito.when(subscription4.getBundleId()).thenReturn(bundleId2);
+        final List<SubscriptionBase> bundleSubscriptions2 = new ArrayList<>();
+        bundleSubscriptions1.add(subscription4);
+        subscriptionsForAccount.put(bundleId2, bundleSubscriptions2);
+
         Mockito.when(subscription1.getId()).thenReturn(UUID.randomUUID());
         Mockito.when(subscription2.getId()).thenReturn(UUID.randomUUID());
         Mockito.when(subscription3.getId()).thenReturn(UUID.randomUUID());
@@ -114,10 +133,10 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
     public void testInsertBlockingEventsForBundle() throws CatalogApiException {
         final DateTime now = clock.getUTCNow();
 
-        final BillingEvent A = createRealEvent(now.minusDays(1).minusHours(1), subscription1);
-        final BillingEvent B = createRealEvent(now.minusDays(1), subscription2);
-        final BillingEvent C = createRealEvent(now.plusDays(1), subscription2);
-        final BillingEvent D = createRealEvent(now.plusDays(3), subscription3);
+        final BillingEvent A = createRealEvent(subscription1, now.minusDays(1).minusHours(1));
+        final BillingEvent B = createRealEvent(subscription2, now.minusDays(1));
+        final BillingEvent C = createRealEvent(subscription2, now.plusDays(1));
+        final BillingEvent D = createRealEvent(subscription3, now.plusDays(3));
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
         billingEvents.add(A);
         billingEvents.add(B);
@@ -131,7 +150,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
                                                                                                                         blockingState2, Optional.<UUID>absent()),
                                                                          internalCallContext);
 
-        blockingCalculator.insertBlockingEvents(billingEvents, new HashSet<UUID>(), catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        blockingCalculator.insertBlockingEvents(billingEvents, new HashSet<UUID>(), subscriptionsForAccount, catalog, internalCallContext);
 
         assertEquals(billingEvents.size(), 7);
 
@@ -161,7 +180,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        billingEvents.add(createRealEvent(now.minusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.minusDays(1)));
 
         final SortedSet<BillingEvent> results = blockingCalculator.eventsToRemove(disabledDuration, billingEvents);
 
@@ -177,8 +196,8 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        final BillingEvent e1 = createRealEvent(now.minusDays(1), subscription1);
-        final BillingEvent e2 = createRealEvent(now.plusDays(1), subscription1);
+        final BillingEvent e1 = createRealEvent(subscription1, now.minusDays(1));
+        final BillingEvent e2 = createRealEvent(subscription1, now.plusDays(1));
         billingEvents.add(e1);
         billingEvents.add(e2);
 
@@ -197,7 +216,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        final BillingEvent e1 = createRealEvent(now.plusDays(1), subscription1);
+        final BillingEvent e1 = createRealEvent(subscription1, now.plusDays(1));
         billingEvents.add(e1);
 
         final SortedSet<BillingEvent> results = blockingCalculator.eventsToRemove(disabledDuration, billingEvents);
@@ -215,7 +234,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        final BillingEvent e1 = createRealEvent(now, subscription1);
+        final BillingEvent e1 = createRealEvent(subscription1, now);
         billingEvents.add(e1);
 
         final SortedSet<BillingEvent> results = blockingCalculator.eventsToRemove(disabledDuration, billingEvents);
@@ -233,7 +252,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        final BillingEvent e1 = createRealEvent(now.minusDays(1), subscription1);
+        final BillingEvent e1 = createRealEvent(subscription1, now.minusDays(1));
         billingEvents.add(e1);
 
         final SortedSet<BillingEvent> results = blockingCalculator.eventsToRemove(disabledDuration, billingEvents);
@@ -250,8 +269,8 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        final BillingEvent e1 = createRealEvent(now.minusDays(1), subscription1);
-        final BillingEvent e2 = createRealEvent(now.plusDays(1), subscription1);
+        final BillingEvent e1 = createRealEvent(subscription1, now.minusDays(1));
+        final BillingEvent e2 = createRealEvent(subscription1, now.plusDays(1));
         billingEvents.add(e1);
         billingEvents.add(e2);
 
@@ -270,9 +289,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        final BillingEvent e1 = createRealEvent(now.minusDays(1), subscription1);
-        final BillingEvent e2 = createRealEvent(now.plusDays(1), subscription1);
-        final BillingEvent e3 = createRealEvent(now.plusDays(3), subscription1);
+        final BillingEvent e1 = createRealEvent(subscription1, now.minusDays(1));
+        final BillingEvent e2 = createRealEvent(subscription1, now.plusDays(1));
+        final BillingEvent e3 = createRealEvent(subscription1, now.plusDays(3));
         billingEvents.add(e1);
         billingEvents.add(e2);
         billingEvents.add(e3);
@@ -292,7 +311,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        final BillingEvent e2 = createRealEvent(now.plusDays(1), subscription1);
+        final BillingEvent e2 = createRealEvent(subscription1, now.plusDays(1));
         billingEvents.add(e2);
 
         final SortedSet<BillingEvent> results = blockingCalculator.eventsToRemove(disabledDuration, billingEvents);
@@ -311,8 +330,8 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
 
-        final BillingEvent e2 = createRealEvent(now.plusDays(1), subscription1);
-        final BillingEvent e3 = createRealEvent(now.plusDays(3), subscription1);
+        final BillingEvent e2 = createRealEvent(subscription1, now.plusDays(1));
+        final BillingEvent e3 = createRealEvent(subscription1, now.plusDays(3));
         billingEvents.add(e2);
         billingEvents.add(e3);
 
@@ -332,7 +351,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
 
-        final BillingEvent e3 = createRealEvent(now.plusDays(3), subscription1);
+        final BillingEvent e3 = createRealEvent(subscription1, now.plusDays(3));
 
         billingEvents.add(e3);
 
@@ -350,14 +369,14 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        billingEvents.add(createRealEvent(now.minusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.minusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext),  internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 1);
         assertEquals(results.first().getEffectiveDate(), now);
         assertNull(results.first().getFixedPrice());
-        assertNull(results.first().getRecurringPrice(null));
+        assertNull(results.first().getRecurringPrice());
         assertEquals(results.first().getBillingPeriod(), BillingPeriod.NO_BILLING_PERIOD);
         assertEquals(results.first().getTransitionType(), SubscriptionBaseTransitionType.START_BILLING_DISABLED);
     }
@@ -371,15 +390,15 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        billingEvents.add(createRealEvent(now.minusDays(1), subscription1));
-        billingEvents.add(createRealEvent(now.plusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.minusDays(1)));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 1);
         assertEquals(results.first().getEffectiveDate(), now);
         assertNull(results.first().getFixedPrice());
-        assertNull(results.first().getRecurringPrice(null));
+        assertNull(results.first().getRecurringPrice());
         assertEquals(results.first().getBillingPeriod(), BillingPeriod.NO_BILLING_PERIOD);
         assertEquals(results.first().getTransitionType(), SubscriptionBaseTransitionType.START_BILLING_DISABLED);
     }
@@ -393,9 +412,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        billingEvents.add(createRealEvent(now.plusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 0);
     }
@@ -409,9 +428,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, null));
-        billingEvents.add(createRealEvent(now, subscription1));
+        billingEvents.add(createRealEvent(subscription1, now));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 0);
     }
@@ -425,19 +444,18 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        billingEvents.add(createRealEvent(now.minusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.minusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
-
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 2);
         assertEquals(results.first().getEffectiveDate(), now);
         assertNull(results.first().getFixedPrice());
-        assertNull(results.first().getRecurringPrice(null));
+        assertNull(results.first().getRecurringPrice());
         assertEquals(results.first().getBillingPeriod(), BillingPeriod.NO_BILLING_PERIOD);
         assertEquals(results.first().getTransitionType(), SubscriptionBaseTransitionType.START_BILLING_DISABLED);
         assertEquals(results.last().getEffectiveDate(), now.plusDays(2));
-        assertEquals(results.last().getRecurringPrice(null), billingEvents.first().getRecurringPrice(null));
+        assertEquals(results.last().getRecurringPrice(), billingEvents.first().getRecurringPrice());
         assertEquals(results.last().getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
     }
 
@@ -450,19 +468,19 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        billingEvents.add(createRealEvent(now.minusDays(1), subscription1));
-        billingEvents.add(createRealEvent(now.plusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.minusDays(1)));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 2);
         assertEquals(results.first().getEffectiveDate(), now);
         assertNull(results.first().getFixedPrice());
-        assertNull(results.first().getRecurringPrice(null));
+        assertNull(results.first().getRecurringPrice());
         assertEquals(results.first().getBillingPeriod(), BillingPeriod.NO_BILLING_PERIOD);
         assertEquals(results.first().getTransitionType(), SubscriptionBaseTransitionType.START_BILLING_DISABLED);
         assertEquals(results.last().getEffectiveDate(), now.plusDays(2));
-        assertEquals(results.last().getRecurringPrice(null), billingEvents.first().getRecurringPrice(null));
+        assertEquals(results.last().getRecurringPrice(), billingEvents.first().getRecurringPrice());
         assertEquals(results.last().getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
     }
 
@@ -475,20 +493,20 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        billingEvents.add(createRealEvent(now.minusDays(1), subscription1));
-        billingEvents.add(createRealEvent(now.plusDays(1), subscription1));
-        billingEvents.add(createRealEvent(now.plusDays(3), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.minusDays(1)));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(1)));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(3)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 2);
         assertEquals(results.first().getEffectiveDate(), now);
         assertNull(results.first().getFixedPrice());
-        assertNull(results.first().getRecurringPrice(null));
+        assertNull(results.first().getRecurringPrice());
         assertEquals(results.first().getBillingPeriod(), BillingPeriod.NO_BILLING_PERIOD);
         assertEquals(results.first().getTransitionType(), SubscriptionBaseTransitionType.START_BILLING_DISABLED);
         assertEquals(results.last().getEffectiveDate(), now.plusDays(2));
-        assertEquals(results.last().getRecurringPrice(null), billingEvents.first().getRecurringPrice(null));
+        assertEquals(results.last().getRecurringPrice(), billingEvents.first().getRecurringPrice());
         assertEquals(results.last().getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
     }
 
@@ -501,13 +519,13 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        billingEvents.add(createRealEvent(now.plusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 1);
         assertEquals(results.last().getEffectiveDate(), now.plusDays(2));
-        assertEquals(results.last().getRecurringPrice(null), billingEvents.first().getRecurringPrice(null));
+        assertEquals(results.last().getRecurringPrice(), billingEvents.first().getRecurringPrice());
         assertEquals(results.last().getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
     }
 
@@ -520,13 +538,13 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        billingEvents.add(createRealEvent(now.plusDays(1), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(1)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 1);
         assertEquals(results.last().getEffectiveDate(), now.plusDays(2));
-        assertEquals(results.last().getRecurringPrice(null), billingEvents.first().getRecurringPrice(null));
+        assertEquals(results.last().getRecurringPrice(), billingEvents.first().getRecurringPrice());
         assertEquals(results.last().getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
     }
 
@@ -539,9 +557,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
 
         disabledDuration.add(new DisabledDuration(now, now.plusDays(2)));
-        billingEvents.add(createRealEvent(now.plusDays(3), subscription1));
+        billingEvents.add(createRealEvent(subscription1, now.plusDays(3)));
 
-        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        final SortedSet<BillingEvent> results = blockingCalculator.createNewEvents(disabledDuration, billingEvents, catalog, internalCallContext);
 
         assertEquals(results.size(), 0);
     }
@@ -552,10 +570,10 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
 
         final SortedSet<BillingEvent> events = new TreeSet<BillingEvent>();
 
-        events.add(createRealEvent(now.minusDays(10), subscription1));
-        events.add(createRealEvent(now.minusDays(6), subscription1));
-        events.add(createRealEvent(now.minusDays(5), subscription1));
-        events.add(createRealEvent(now.minusDays(1), subscription1));
+        events.add(createRealEvent(subscription1, now.minusDays(10)));
+        events.add(createRealEvent(subscription1, now.minusDays(6)));
+        events.add(createRealEvent(subscription1, now.minusDays(5)));
+        events.add(createRealEvent(subscription1, now.minusDays(1)));
 
         final BillingEvent minus11 = blockingCalculator.precedingBillingEventForSubscription(now.minusDays(11), events);
         assertNull(minus11);
@@ -566,78 +584,37 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
 
     }
 
-    protected BillingEvent createRealEvent(final DateTime effectiveDate, final SubscriptionBase subscription) {
-        return createRealEvent(effectiveDate, subscription, SubscriptionBaseTransitionType.CHANGE);
-    }
-
-    protected BillingEvent createRealEvent(final DateTime effectiveDate, final SubscriptionBase subscription, final SubscriptionBaseTransitionType type)  {
-        try {
-
-            final Integer billCycleDay = 1;
-            final Plan plan = new MockPlan();
-            final Currency currency = Currency.USD;
-            final String description = "";
-            final BillingPeriod billingPeriod = BillingPeriod.MONTHLY;
-            final Long totalOrdering = 0L;
-            final DateTimeZone tz = DateTimeZone.UTC;
-
-
-            final PlanPhase planPhase = Mockito.mock(PlanPhase.class);
-
-            final InternationalPrice recurringPrice = Mockito.mock(InternationalPrice.class);
-
-            Mockito.when(recurringPrice.getPrice(Mockito.<Currency>any())).thenReturn(BigDecimal.TEN);
-            final Recurring recurring = Mockito.mock(Recurring.class);
-            Mockito.when(recurring.getRecurringPrice()).thenReturn(recurringPrice);
-            Mockito.when(planPhase.getRecurring()).thenReturn(recurring);
-            Mockito.when(planPhase.getUsages()).thenReturn(new DefaultUsage[0]);
-
-            final BigDecimal fixedPrice = BigDecimal.TEN;
-
-            return new DefaultBillingEvent(subscription, effectiveDate, true, plan, planPhase, fixedPrice,
-                                           currency,
-                                           billingPeriod, billCycleDay,
-                                           description, totalOrdering, type, null, false);
-
-        } catch (final CatalogApiException e) {
-            Assert.fail("", e);
-        }
-        throw new IllegalStateException();
-    }
-
     @Test(groups = "fast")
     public void testFilter() {
         final SortedSet<BillingEvent> events = new TreeSet<BillingEvent>();
 
-        events.add(createBillingEvent(subscription1));
-        events.add(createBillingEvent(subscription1));
-        events.add(createBillingEvent(subscription1));
-        events.add(createBillingEvent(subscription2));
+        events.add(createBillingEvent(subscription1, 1L));
+        events.add(createBillingEvent(subscription1, 2L));
+        events.add(createBillingEvent(subscription1, 3L));
+        events.add(createBillingEvent(subscription2, 4L));
 
         final SortedSet<BillingEvent> result1 = blockingCalculator.filter(events, subscription1);
         final SortedSet<BillingEvent> result2 = blockingCalculator.filter(events, subscription2);
         final SortedSet<BillingEvent> result3 = blockingCalculator.filter(events, subscription3);
 
         assertEquals(result1.size(), 3);
-        assertEquals(result1.first().getSubscription(), subscription1);
-        assertEquals(result1.last().getSubscription(), subscription1);
         assertEquals(result2.size(), 1);
-        assertEquals(result2.first().getSubscription(), subscription2);
         assertEquals(result3.size(), 0);
     }
 
     @Test(groups = "fast")
     public void testCreateNewDisableEvent() throws CatalogApiException {
         final DateTime now = clock.getUTCNow();
-        final BillingEvent event = new MockBillingEvent();
 
-        final BillingEvent result = blockingCalculator.createNewDisableEvent(now, event, null);
+        final BillingEvent event = createRealEvent(subscription1, now);
+
+        final BillingEvent result = blockingCalculator.createNewDisableEvent(now, event);
         assertEquals(result.getBillCycleDayLocal(), event.getBillCycleDayLocal());
         assertEquals(result.getEffectiveDate(), now);
         assertEquals(result.getPlanPhase(), event.getPlanPhase());
         assertEquals(result.getPlan(), event.getPlan());
         assertNull(result.getFixedPrice());
-        assertNull(result.getRecurringPrice(null));
+        assertNull(result.getRecurringPrice());
         assertEquals(result.getCurrency(), event.getCurrency());
         assertEquals(result.getDescription(), "");
         assertEquals(result.getBillingPeriod(), BillingPeriod.NO_BILLING_PERIOD);
@@ -649,53 +626,21 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
     @Test(groups = "fast")
     public void testCreateNewReenableEvent() throws CatalogApiException {
         final DateTime now = clock.getUTCNow();
-        final BillingEvent event = new MockBillingEvent();
+        final BillingEvent event = createRealEvent(subscription1, now);
 
-        final BillingEvent result = blockingCalculator.createNewReenableEvent(now, event, null, internalCallContext);
+        final BillingEvent result = blockingCalculator.createNewReenableEvent(now, event, internalCallContext);
         assertEquals(result.getBillCycleDayLocal(), event.getBillCycleDayLocal());
         assertEquals(result.getEffectiveDate(), now);
         assertEquals(result.getPlanPhase(), event.getPlanPhase());
         assertEquals(result.getPlan(), event.getPlan());
         assertEquals(result.getFixedPrice(), event.getFixedPrice());
-        assertEquals(result.getRecurringPrice(null), event.getRecurringPrice(null));
+        assertEquals(result.getRecurringPrice(), event.getRecurringPrice());
         assertEquals(result.getCurrency(), event.getCurrency());
         assertEquals(result.getDescription(), "");
         assertEquals(result.getBillingPeriod(), event.getBillingPeriod());
         assertEquals(result.getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
         // TODO - ugly, fragile
         assertEquals(result.getTotalOrdering(), (Long) (BlockingCalculator.getGlobalTotalOrder().get() - 1));
-    }
-
-    private class MockBillingEvent extends DefaultBillingEvent {
-
-        public MockBillingEvent() throws CatalogApiException {
-            super(subscription1, clock.getUTCNow(), true, null, null, BigDecimal.ZERO, Currency.USD, BillingPeriod.ANNUAL,
-                  4, "", 3L, SubscriptionBaseTransitionType.CREATE, null, false);
-        }
-    }
-
-    @Test(groups = "fast")
-    public void testCreateBundleSubscriptionMap() {
-        final SortedSet<BillingEvent> events = new TreeSet<BillingEvent>();
-        events.add(createBillingEvent(subscription1));
-        events.add(createBillingEvent(subscription2));
-        events.add(createBillingEvent(subscription3));
-        events.add(createBillingEvent(subscription4));
-
-        final Hashtable<UUID, List<SubscriptionBase>> map = blockingCalculator.createBundleSubscriptionMap(events);
-
-        assertNotNull(map);
-        assertEquals(map.keySet().size(), 2);
-        assertEquals(map.get(bundleId1).size(), 3);
-        assertEquals(map.get(bundleId2).size(), 1);
-
-    }
-
-    private BillingEvent createBillingEvent(final SubscriptionBase subscription) {
-        final BillingEvent result = Mockito.mock(BillingEvent.class);
-        Mockito.when(result.getSubscription()).thenReturn(subscription);
-        Mockito.when(result.compareTo(Mockito.<BillingEvent>any())).thenReturn(1);
-        return result;
     }
 
     @Test(groups = "fast")
@@ -833,9 +778,9 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
     @Test(groups = "fast")
     public void testSimpleWithClearBlockingDuration() throws Exception {
 
-        final BillingEvent trial = createRealEvent(new LocalDate(2012, 5, 1).toDateTimeAtStartOfDay(DateTimeZone.UTC), subscription1, SubscriptionBaseTransitionType.CREATE);
-        final BillingEvent phase = createRealEvent(new LocalDate(2012, 5, 31).toDateTimeAtStartOfDay(DateTimeZone.UTC), subscription1, SubscriptionBaseTransitionType.PHASE);
-        final BillingEvent upgrade = createRealEvent(new LocalDate(2012, 7, 25).toDateTimeAtStartOfDay(DateTimeZone.UTC), subscription1, SubscriptionBaseTransitionType.CHANGE);
+        final BillingEvent trial = createRealEvent(subscription1, new LocalDate(2012, 5, 1).toDateTimeAtStartOfDay(DateTimeZone.UTC), SubscriptionBaseTransitionType.CREATE);
+        final BillingEvent phase = createRealEvent(subscription1, new LocalDate(2012, 5, 31).toDateTimeAtStartOfDay(DateTimeZone.UTC), SubscriptionBaseTransitionType.PHASE);
+        final BillingEvent upgrade = createRealEvent(subscription1, new LocalDate(2012, 7, 25).toDateTimeAtStartOfDay(DateTimeZone.UTC), SubscriptionBaseTransitionType.CHANGE);
         final SortedSet<BillingEvent> billingEvents = new TreeSet<BillingEvent>();
         billingEvents.add(trial);
         billingEvents.add(phase);
@@ -852,7 +797,7 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
                                                                                                                         blockingState4, Optional.<UUID>absent()),
                                                                          internalCallContext);
 
-        blockingCalculator.insertBlockingEvents(billingEvents, new HashSet<UUID>(), catalogInternalApi.getFullCatalog(true, true, internalCallContext), internalCallContext);
+        blockingCalculator.insertBlockingEvents(billingEvents, new HashSet<UUID>(), subscriptionsForAccount, catalog, internalCallContext);
 
         assertEquals(billingEvents.size(), 5);
         final List<BillingEvent> events = new ArrayList<BillingEvent>(billingEvents);
@@ -865,5 +810,64 @@ public class TestBlockingCalculator extends JunctionTestSuiteNoDB {
         assertEquals(events.get(3).getEffectiveDate(), new LocalDate(2012, 7, 25).toDateTimeAtStartOfDay(DateTimeZone.UTC));
         assertEquals(events.get(3).getTransitionType(), SubscriptionBaseTransitionType.END_BILLING_DISABLED);
         assertEquals(events.get(4).getEffectiveDate(), new LocalDate(2012, 7, 25).toDateTimeAtStartOfDay(DateTimeZone.UTC));
-        assertEquals(events.get(4).getTransitionType(), SubscriptionBaseTransitionType.CHANGE);    }
+        assertEquals(events.get(4).getTransitionType(), SubscriptionBaseTransitionType.CHANGE);
+    }
+
+    private BillingEvent createBillingEvent(final SubscriptionBase subscription, final Long totalOrdering) {
+        return createRealEvent(subscription, new DateTime(), SubscriptionBaseTransitionType.CREATE, totalOrdering);
+    }
+
+    protected BillingEvent createRealEvent(final SubscriptionBase subscription, final DateTime effectiveDate) {
+        return createRealEvent(subscription, effectiveDate, SubscriptionBaseTransitionType.CHANGE);
+    }
+
+    protected BillingEvent createRealEvent(final SubscriptionBase subscription, final DateTime effectiveDate, final SubscriptionBaseTransitionType type) {
+        return createRealEvent(subscription, effectiveDate, type, 0L);
+    }
+
+    private BillingEvent createRealEvent(final SubscriptionBase subscription, final DateTime effectiveDate, final SubscriptionBaseTransitionType type, final Long totalOrdering) {
+        try {
+
+            final Integer billCycleDay = 1;
+            final Plan plan = new MockPlan();
+            final Currency currency = Currency.USD;
+            final String description = "";
+            final BillingPeriod billingPeriod = BillingPeriod.MONTHLY;
+
+            final PlanPhase planPhase = Mockito.mock(PlanPhase.class);
+
+            final InternationalPrice internationalPrice = Mockito.mock(InternationalPrice.class);
+
+            Mockito.when(internationalPrice.getPrice(Mockito.<Currency>any())).thenReturn(BigDecimal.TEN);
+            final Recurring recurring = Mockito.mock(Recurring.class);
+            Mockito.when(recurring.getRecurringPrice()).thenReturn(internationalPrice);
+            Mockito.when(planPhase.getRecurring()).thenReturn(recurring);
+            Mockito.when(planPhase.getUsages()).thenReturn(new DefaultUsage[0]);
+
+            final BigDecimal fixedPrice = BigDecimal.TEN;
+            final BigDecimal recurringPrice = BigDecimal.TEN;
+
+            return new DefaultBillingEvent(subscription.getId(),
+                                           subscription.getBundleId(),
+                                           effectiveDate,
+                                           plan,
+                                           planPhase,
+                                           fixedPrice,
+                                           recurringPrice,
+                                           ImmutableList.of(),
+                                           currency,
+                                           billingPeriod,
+                                           billCycleDay,
+                                           description,
+                                           totalOrdering,
+                                           type,
+                                           false
+            );
+
+        } catch (final CatalogApiException e) {
+            Assert.fail("", e);
+        }
+        throw new IllegalStateException();
+    }
+
 }

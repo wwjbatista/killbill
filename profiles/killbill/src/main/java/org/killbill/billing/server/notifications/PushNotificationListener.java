@@ -31,6 +31,7 @@ import org.killbill.billing.ObjectType;
 import org.killbill.billing.callcontext.InternalTenantContext;
 import org.killbill.billing.jaxrs.json.NotificationJson;
 import org.killbill.billing.notification.plugin.api.ExtBusEvent;
+import org.killbill.billing.platform.api.KillbillService.KILLBILL_SERVICES;
 import org.killbill.billing.server.DefaultServerService;
 import org.killbill.billing.tenant.api.TenantApiException;
 import org.killbill.billing.tenant.api.TenantKV.TenantKey;
@@ -85,7 +86,9 @@ public class PushNotificationListener {
     public PushNotificationListener(final ObjectMapper mapper, final TenantUserApi tenantApi, final CallContextFactory contextFactory,
                                     final NotificationQueueService notificationQueueService, final InternalCallContextFactory internalCallContextFactory,
                                     final Clock clock, final NotificationConfig notificationConfig) {
-        this.httpClient = new AsyncHttpClient(new AsyncHttpClientConfig.Builder().setRequestTimeout(TIMEOUT_NOTIFICATION * 1000).build());
+        this.httpClient = new AsyncHttpClient(new AsyncHttpClientConfig.Builder()
+                                                      .setConnectTimeout(TIMEOUT_NOTIFICATION * 1000)
+                                                      .setRequestTimeout(TIMEOUT_NOTIFICATION * 1000).build());
         this.tenantApi = tenantApi;
         this.contextFactory = contextFactory;
         this.mapper = mapper;
@@ -142,11 +145,9 @@ public class PushNotificationListener {
                         }
                     });
             response = futureStatus.get(timeoutSec, TimeUnit.SECONDS);
-        } catch (final TimeoutException toe) {
-            saveRetryPushNotificationInQueue(tenantId, url, notification, attemptRetryNumber, "Timeout");
-            return false;
         } catch (final Exception e) {
             log.warn("Failed to push notification url='{}', tenantId='{}'", url, tenantId, e);
+            saveRetryPushNotificationInQueue(tenantId, url, notification, attemptRetryNumber, e.getMessage());
             return false;
         }
 
@@ -160,7 +161,7 @@ public class PushNotificationListener {
 
     public void resendPushNotification(final PushNotificationKey key) throws JsonProcessingException {
 
-        final NotificationJson notification = new NotificationJson(key.getEventType() != null ? key.getEventType().toString() : null,
+        final NotificationJson notification = new NotificationJson(key.getEventType(),
                                                                    key.getAccountId(),
                                                                    key.getObjectType() != null ? key.getObjectType().toString() : null,
                                                                    key.getObjectId(),
@@ -191,7 +192,7 @@ public class PushNotificationListener {
         final Long accountRecordId = internalCallContextFactory.getRecordIdFromObject(key.getAccountId(), ObjectType.ACCOUNT, tenantContext);
         final Long tenantRecordId = internalCallContextFactory.getRecordIdFromObject(key.getTenantId(), ObjectType.TENANT, tenantContext);
         try {
-            final NotificationQueue notificationQueue = notificationQueueService.getNotificationQueue(DefaultServerService.SERVER_SERVICE, PushNotificationRetryService.QUEUE_NAME);
+            final NotificationQueue notificationQueue = notificationQueueService.getNotificationQueue(KILLBILL_SERVICES.SERVER_SERVICE.getServiceName(), PushNotificationRetryService.QUEUE_NAME);
             notificationQueue.recordFutureNotification(nextNotificationTime, key, null, MoreObjects.firstNonNull(accountRecordId, new Long(0)), tenantRecordId);
         } catch (final NoSuchNotificationQueue noSuchNotificationQueue) {
             log.error("Failed to push notification url='{}', tenantId='{}'", key.getUrl(), key.getTenantId(), noSuchNotificationQueue);

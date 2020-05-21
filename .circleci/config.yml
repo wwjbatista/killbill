@@ -8,7 +8,7 @@ jobs:
   build:
     <<: *defaults
     docker:
-      - image: killbill/kbbuild:0.4.0
+      - image: killbill/kbbuild:0.7.0
     steps:
       - checkout
       - restore_cache:
@@ -38,12 +38,12 @@ jobs:
   test-h2:
     <<: *defaults
     docker:
-      - image: killbill/kbbuild:0.4.0
+      - image: killbill/kbbuild:0.7.0
     steps:
       - checkout
       - restore_cache:
           key: v1-dependencies-{{ .Branch }}-{{ checksum "pom.xml" }}
-      - run: mvn clean install -Ptravis
+      - run: mvn -Djava.security.egd=file:/dev/./urandom clean install -Ptravis
       - run:
           name: Save test results
           command: |
@@ -57,8 +57,8 @@ jobs:
   test-mysql:
     <<: *defaults
     docker:
-      - image: killbill/kbbuild:0.4.0
-      - image: killbill/mariadb:0.19
+      - image: killbill/kbbuild:0.7.0
+      - image: killbill/mariadb:0.22
         environment:
         - MYSQL_ROOT_PASSWORD=root
     steps:
@@ -82,7 +82,7 @@ jobs:
 
             set -e
             ./bin/db-helper -a create --driver mysql -u root -p root -t yes -h 127.0.0.1
-      - run: mvn clean install -Plocaltest-mysql
+      - run: mvn -Djava.security.egd=file:/dev/./urandom clean install -Plocaltest-mysql
       - run:
           name: Save test results
           command: |
@@ -96,8 +96,8 @@ jobs:
   test-postgresql:
     <<: *defaults
     docker:
-      - image: killbill/kbbuild:0.4.0
-      - image: killbill/postgresql:0.19
+      - image: killbill/kbbuild:0.7.0
+      - image: killbill/postgresql:0.22
         environment:
         - POSTGRES_PASSWORD=postgres
     steps:
@@ -107,7 +107,7 @@ jobs:
       - run:
           name: Setup latest DDL
           command: ./bin/db-helper -a create --driver postgres -u postgres -p postgres -t yes
-      - run: mvn clean install -Plocaltest-postgresql
+      - run: mvn -Djava.security.egd=file:/dev/./urandom clean install -Plocaltest-postgresql
       - run:
           name: Save test results
           command: |
@@ -122,8 +122,8 @@ jobs:
   integration-tests:
     <<: *defaults
     docker:
-      - image: killbill/kbbuild:0.4.0
-      - image: killbill/mariadb:0.19
+      - image: killbill/kbbuild:0.7.0
+      - image: killbill/mariadb:0.22
         environment:
         - MYSQL_ROOT_PASSWORD=root
     steps:
@@ -138,6 +138,9 @@ jobs:
           command: |
             set +e
 
+            KILLBILL_VERSION=`grep -E '<version>([0-9]+\.[0-9]+\.[0-9]+)(-SNAPSHOT)?</version>' pom.xml | sed -n '2p' | sed 's/[\t \n]*<version>\(.*\)<\/version>[\t \n]*/\1/'`
+            echo "Detected Kill Bill version: $KILLBILL_VERSION"
+
             mvn clean install -DskipTests=true
             mkdir -p /tmp/test-results
             nohup ./bin/start-server -s > /tmp/test-results/killbill.log 2>&1 &
@@ -148,16 +151,19 @@ jobs:
             mkdir -p /home/killbill/killbill-integration-tests
             git clone https://github.com/killbill/killbill-integration-tests.git /home/killbill/killbill-integration-tests
             pushd /home/killbill/killbill-integration-tests
-            #if [ "${CIRCLE_BRANCH}" != "master" ]; then
-            #  if [ -n "$(git ls-remote --heads https://github.com/killbill/killbill-integration-tests.git ${CIRCLE_BRANCH})" ]; then
-            #    echo "Switching to branch ${CIRCLE_BRANCH}"
-            #    git checkout -b ${CIRCLE_BRANCH} origin/${CIRCLE_BRANCH}
-            #  else
-            #    echo "killbill-integration-tests doesn't have a branch ${CIRCLE_BRANCH}, staying on master"
-            #  fi
-            #fi
-            # For now, always expect work-for-release-0.19.x
-            git checkout -b work-for-release-0.19.x origin/work-for-release-0.19.x
+            if [ "${CIRCLE_BRANCH}" != "master" ]; then
+              if [ -n "$(git ls-remote --heads https://github.com/killbill/killbill-integration-tests.git ${CIRCLE_BRANCH})" ]; then
+                echo "Switching to branch ${CIRCLE_BRANCH}"
+                git checkout -b ${CIRCLE_BRANCH} origin/${CIRCLE_BRANCH}
+              else
+                if [ -n "$(echo $KILLBILL_VERSION | grep -E '^0.21')" ]; then
+                  echo "Switching to branch work-for-release-0.21.x"
+                  git checkout -b work-for-release-0.21.x origin/work-for-release-0.21.x
+                else
+                  echo "killbill-integration-tests doesn't have a branch ${CIRCLE_BRANCH}, staying on master"
+                fi
+              fi
+            fi
 
             source /usr/share/rvm/scripts/rvm
             rvm use ruby-2.4.2

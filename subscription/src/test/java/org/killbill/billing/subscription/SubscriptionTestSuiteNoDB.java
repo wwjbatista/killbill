@@ -18,6 +18,7 @@
 
 package org.killbill.billing.subscription;
 
+import java.util.Map;
 import java.util.UUID;
 
 import javax.inject.Inject;
@@ -31,8 +32,6 @@ import org.killbill.billing.account.api.ImmutableAccountData;
 import org.killbill.billing.account.api.ImmutableAccountInternalApi;
 import org.killbill.billing.api.TestApiListener;
 import org.killbill.billing.callcontext.InternalTenantContext;
-import org.killbill.billing.catalog.api.Catalog;
-import org.killbill.billing.catalog.api.CatalogInternalApi;
 import org.killbill.billing.catalog.api.CatalogService;
 import org.killbill.billing.dao.MockNonEntityDao;
 import org.killbill.billing.lifecycle.api.BusService;
@@ -43,13 +42,15 @@ import org.killbill.billing.subscription.api.timeline.SubscriptionBaseTimelineAp
 import org.killbill.billing.subscription.api.transfer.SubscriptionBaseTransferApi;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseBundle;
 import org.killbill.billing.subscription.api.user.TestSubscriptionHelper;
+import org.killbill.billing.subscription.catalog.DefaultSubscriptionCatalogApi;
+import org.killbill.billing.subscription.catalog.SubscriptionCatalog;
+import org.killbill.billing.subscription.catalog.SubscriptionCatalogApi;
 import org.killbill.billing.subscription.engine.dao.MockSubscriptionDaoMemory;
 import org.killbill.billing.subscription.engine.dao.SubscriptionDao;
 import org.killbill.billing.subscription.glue.TestDefaultSubscriptionModuleNoDB;
 import org.killbill.billing.util.cache.CacheControllerDispatcher;
 import org.killbill.billing.util.callcontext.InternalCallContextFactory;
 import org.killbill.billing.util.config.definition.SubscriptionConfig;
-import org.killbill.clock.ClockMock;
 import org.mockito.Mockito;
 import org.skife.jdbi.v2.IDBI;
 import org.skife.jdbi.v2.tweak.HandleCallback;
@@ -85,8 +86,9 @@ public class SubscriptionTestSuiteNoDB extends GuicyKillbillTestSuiteNoDB {
 
     @Inject
     protected CatalogService catalogService;
+
     @Inject
-    protected CatalogInternalApi catalogInternalApi;
+    protected SubscriptionCatalogApi subscriptionCatalogApi;
     @Inject
     protected SubscriptionConfig config;
     @Inject
@@ -115,13 +117,13 @@ public class SubscriptionTestSuiteNoDB extends GuicyKillbillTestSuiteNoDB {
     @Inject
     protected InternalCallContextFactory internalCallContextFactory;
 
-    protected Catalog catalog;
+    protected SubscriptionCatalog catalog;
     protected AccountData accountData;
     protected SubscriptionBaseBundle bundle;
 
     @Override
-    protected KillbillConfigSource getConfigSource() {
-        return getConfigSource("/subscription.properties");
+    protected KillbillConfigSource getConfigSource(final Map<String, String> extraProperties) {
+        return getConfigSource("/subscription.properties", extraProperties);
     }
 
     @BeforeClass(groups = "fast")
@@ -130,7 +132,7 @@ public class SubscriptionTestSuiteNoDB extends GuicyKillbillTestSuiteNoDB {
             return;
         }
 
-        final Injector g = Guice.createInjector(Stage.PRODUCTION, new TestDefaultSubscriptionModuleNoDB(configSource));
+        final Injector g = Guice.createInjector(Stage.PRODUCTION, new TestDefaultSubscriptionModuleNoDB(configSource, clock));
         g.injectMembers(this);
 
         // For TestApiListener#isCompleted
@@ -148,7 +150,7 @@ public class SubscriptionTestSuiteNoDB extends GuicyKillbillTestSuiteNoDB {
 
         subscriptionTestInitializer.startTestFramework(testListener, clock, busService, subscriptionBaseService);
 
-        this.catalog = subscriptionTestInitializer.initCatalog(catalogService, internalCallContext);
+        this.catalog = DefaultSubscriptionCatalogApi.wrapCatalog(subscriptionTestInitializer.initCatalog(catalogService, internalCallContext), clock);
         this.accountData = subscriptionTestInitializer.initAccountData(clock);
 
         final Account account = GuicyKillbillTestSuiteNoDB.createMockAccount(accountData,

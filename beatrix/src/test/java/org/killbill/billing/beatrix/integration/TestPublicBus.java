@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2017 Groupon, Inc
- * Copyright 2014-2017 The Billing Project, LLC
+ * Copyright 2014-2018 Groupon, Inc
+ * Copyright 2014-2018 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -20,6 +20,8 @@ package org.killbill.billing.beatrix.integration;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,6 +37,7 @@ import org.killbill.billing.entitlement.api.DefaultEntitlement;
 import org.killbill.billing.notification.plugin.api.ExtBusEvent;
 import org.killbill.billing.notification.plugin.api.ExtBusEventType;
 import org.killbill.billing.notification.plugin.api.InvoiceNotificationMetadata;
+import org.killbill.billing.notification.plugin.api.InvoicePaymentMetadata;
 import org.killbill.billing.notification.plugin.api.SubscriptionMetadata;
 import org.killbill.billing.overdue.api.OverdueConfig;
 import org.killbill.billing.platform.api.KillbillConfigSource;
@@ -53,7 +56,6 @@ import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonMappingException;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.eventbus.Subscribe;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -68,12 +70,12 @@ public class TestPublicBus extends TestIntegrationBase {
     private AtomicInteger externalBusCount;
 
     @Override
-    protected KillbillConfigSource getConfigSource() {
-        return getConfigSource(null, new ImmutableMap.Builder()
-                .putAll(DEFAULT_BEATRIX_PROPERTIES)
-                .put("org.killbill.billing.util.broadcast.rate", "500ms")
-                .put("org.killbill.invoice.dryRunNotificationSchedule", "1d")
-                .build());
+    protected KillbillConfigSource getConfigSource(final Map<String, String> extraProperties) {
+        final Map<String, String> allExtraProperties = new HashMap<String, String>(extraProperties);
+        allExtraProperties.putAll(DEFAULT_BEATRIX_PROPERTIES);
+        allExtraProperties.put("org.killbill.billing.util.broadcast.rate", "500ms");
+        allExtraProperties.put("org.killbill.invoice.dryRunNotificationSchedule", "1d");
+        return getConfigSource(null, allExtraProperties);
     }
 
     @Override
@@ -135,7 +137,6 @@ public class TestPublicBus extends TestIntegrationBase {
         log.info("Beginning test with BCD of " + billingDay);
         final Account account = createAccountWithNonOsgiPaymentMethod(getAccountData(billingDay));
         assertNotNull(account);
-
 
         //
         // CREATE SUBSCRIPTION AND EXPECT BOTH EVENTS: NextEvent.CREATE, NextEvent.BLOCK NextEvent.INVOICE
@@ -204,6 +205,9 @@ public class TestPublicBus extends TestIntegrationBase {
                     Assert.assertEquals(obj.getAmountOwed().compareTo(new BigDecimal("249.95")), 0);
                     Assert.assertEquals(obj.getCurrency(), Currency.USD);
                     Assert.assertNotNull(obj.getTargetDate());
+                } else if (event.getEventType() == ExtBusEventType.INVOICE_PAYMENT_SUCCESS) {
+                    final InvoicePaymentMetadata obj = mapper.readValue(event.getMetaData(), InvoicePaymentMetadata.class);
+                    Assert.assertNotNull(obj.getPaymentAttemptId());
                 }
 
             } catch (final JsonParseException e) {

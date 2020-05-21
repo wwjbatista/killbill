@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2018 Groupon, Inc
- * Copyright 2014-2018 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -75,7 +75,7 @@ public class DefaultTagDao extends EntityDaoBase<TagModelDao, Tag, TagApiExcepti
     @Inject
     public DefaultTagDao(final IDBI dbi, @Named(MAIN_RO_IDBI_NAMED) final IDBI roDbi, final TagEventBuilder tagEventBuilder, final PersistentBus bus, final Clock clock,
                          final CacheControllerDispatcher controllerDispatcher, final NonEntityDao nonEntityDao, final InternalCallContextFactory internalCallContextFactory, final AuditDao auditDao) {
-        super(new EntitySqlDaoTransactionalJdbiWrapper(dbi, roDbi, clock, controllerDispatcher, nonEntityDao, internalCallContextFactory), TagSqlDao.class);
+        super(nonEntityDao, controllerDispatcher, new EntitySqlDaoTransactionalJdbiWrapper(dbi, roDbi, clock, controllerDispatcher, nonEntityDao, internalCallContextFactory), TagSqlDao.class);
         this.tagEventBuilder = tagEventBuilder;
         this.bus = bus;
         this.auditDao = auditDao;
@@ -201,7 +201,25 @@ public class DefaultTagDao extends EntityDaoBase<TagModelDao, Tag, TagApiExcepti
 
     @Override
     public void create(final TagModelDao entity, final InternalCallContext context) throws TagApiException {
+
+        validateApplicableObjectTypes(entity.getTagDefinitionId(), entity.getObjectType());
         transactionalSqlDao.execute(false, TagApiException.class, getCreateEntitySqlDaoTransactionWrapper(entity, context));
+    }
+
+    private void validateApplicableObjectTypes(final UUID tagDefinitionId, final ObjectType objectType) throws TagApiException {
+
+        final ControlTagType controlTagType = Iterables.tryFind(ImmutableList.<ControlTagType>copyOf(ControlTagType.values()), new Predicate<ControlTagType>() {
+            @Override
+            public boolean apply(final ControlTagType input) {
+                return input.getId().equals(tagDefinitionId);
+            }
+        }).orNull();
+
+        if (controlTagType != null && !controlTagType.getApplicableObjectTypes().contains(objectType)) {
+            // TODO Add missing ErrorCode.TAG_NOT_APPLICABLE
+            // throw new TagApiException(ErrorCode.TAG_NOT_APPLICABLE);
+            throw new IllegalStateException(String.format("Invalid control tag '%s' for object type '%s'", controlTagType.name(), objectType));
+        }
     }
 
     @Override

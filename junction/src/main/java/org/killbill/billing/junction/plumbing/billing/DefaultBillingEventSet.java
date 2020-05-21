@@ -27,10 +27,12 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
 
-import org.killbill.billing.catalog.api.BillingMode;
+import org.killbill.billing.catalog.api.CatalogApiException;
 import org.killbill.billing.catalog.api.Usage;
 import org.killbill.billing.junction.BillingEvent;
 import org.killbill.billing.junction.BillingEventSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
@@ -38,13 +40,14 @@ import com.google.common.collect.Sets;
 
 public class DefaultBillingEventSet extends TreeSet<BillingEvent> implements SortedSet<BillingEvent>, BillingEventSet {
 
+    private static final Logger logger = LoggerFactory.getLogger(DefaultBillingEventSet.class);
+
     private static final long serialVersionUID = 1L;
 
     private final boolean accountAutoInvoiceOff;
     private final boolean accountAutoInvoiceDraft;
     private final boolean accountAutoInvoiceReuseDraft;
     private final List<UUID> subscriptionIdsWithAutoInvoiceOff;
-
 
     public DefaultBillingEventSet(final boolean accountAutoInvoiceOff, final boolean accountAutoInvoiceDraft, final boolean accountAutoInvoiceReuseDraft) {
         this.accountAutoInvoiceOff = accountAutoInvoiceOff;
@@ -78,7 +81,11 @@ public class DefaultBillingEventSet extends TreeSet<BillingEvent> implements Sor
         final Iterable<Usage> allUsages = Iterables.concat(Iterables.transform(this, new Function<BillingEvent, List<Usage>>() {
             @Override
             public List<Usage> apply(final BillingEvent input) {
-                return input.getUsages();
+                try {
+                    return input.getUsages();
+                } catch (final CatalogApiException e) {
+                    throw new IllegalStateException(String.format("Failed to retrieve usage section for billing event %s", input), e);
+                }
             }
         }));
         if (!allUsages.iterator().hasNext()) {

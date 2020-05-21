@@ -54,6 +54,7 @@ import org.killbill.billing.payment.plugin.api.PaymentPluginApi;
 import org.killbill.billing.payment.plugin.api.PaymentTransactionInfoPlugin;
 import org.killbill.billing.payment.retry.DefaultRetryService;
 import org.killbill.billing.payment.retry.PaymentRetryNotificationKey;
+import org.killbill.billing.platform.api.KillbillService.KILLBILL_SERVICES;
 import org.killbill.billing.tag.TagInternalApi;
 import org.killbill.billing.util.callcontext.CallContext;
 import org.killbill.billing.util.callcontext.InternalCallContextFactory;
@@ -182,7 +183,7 @@ public class PaymentProcessor extends ProcessorBase {
 
     public void cancelScheduledPaymentTransaction(final UUID lastPaymentAttemptId, final InternalCallContext internalCallContext) throws PaymentApiException {
         try {
-            final NotificationQueue retryQueue = notificationQueueService.getNotificationQueue(DefaultPaymentService.SERVICE_NAME, DefaultRetryService.QUEUE_NAME);
+            final NotificationQueue retryQueue = notificationQueueService.getNotificationQueue(KILLBILL_SERVICES.PAYMENT_SERVICE.getServiceName(), DefaultRetryService.QUEUE_NAME);
             final Iterable<NotificationEventWithMetadata<NotificationEvent>> notificationEventWithMetadatas =
                     retryQueue.getFutureNotificationForSearchKeys(internalCallContext.getAccountRecordId(), internalCallContext.getTenantRecordId());
 
@@ -288,7 +289,7 @@ public class PaymentProcessor extends ProcessorBase {
             if (runJanitor) {
                 final PaymentPluginApi plugin = getPaymentProviderPlugin(paymentModelDao.getPaymentMethodId(), true, internalCallContext);
                 final List<PaymentTransactionInfoPlugin> pluginTransactions = paymentRefresher.getPaymentTransactionInfoPlugins(plugin, paymentModelDao, properties, callContext);
-                paymentModelDao = paymentRefresher.invokeJanitor(paymentModelDao, paymentTransactionsForCurrentPayment, pluginTransactions, internalCallContext);
+                paymentModelDao = paymentRefresher.invokeJanitor(paymentModelDao, paymentTransactionsForCurrentPayment, pluginTransactions, isApiPayment, internalCallContext);
             }
 
             if (paymentStateContext.getPaymentTransactionExternalKey() != null) {
@@ -327,7 +328,7 @@ public class PaymentProcessor extends ProcessorBase {
 
         paymentAutomatonRunner.run(paymentStateContext, daoHelper, currentStateName, transactionType);
 
-        return paymentRefresher.getPayment(paymentStateContext.getPaymentModelDao(), true, false, properties, callContext, internalCallContext);
+        return paymentRefresher.getPayment(paymentStateContext.getPaymentModelDao(), true, false, isApiPayment, properties, callContext, internalCallContext);
     }
 
     private void runSanityOnTransactionExternalKey(final Iterable<PaymentTransactionModelDao> allPaymentTransactionsForKey,

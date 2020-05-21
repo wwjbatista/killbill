@@ -19,13 +19,18 @@
     <parent>
         <artifactId>killbill</artifactId>
         <groupId>org.kill-bill.billing</groupId>
-        <version>0.20.1-SNAPSHOT</version>
+        <version>0.22.9-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>killbill-beatrix</artifactId>
     <packaging>jar</packaging>
     <name>killbill-beatrix</name>
     <dependencies>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-core</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
@@ -62,17 +67,19 @@
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>
-            <artifactId>command</artifactId>
+            <artifactId>testing-mysql-server</artifactId>
+            <!-- Technically, test-runtime -->
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>testing-postgresql-server</artifactId>
+            <!-- Technically, test-runtime -->
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>units</artifactId>
+            <groupId>it.ozimov</groupId>
+            <artifactId>embedded-redis</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -87,11 +94,6 @@
         <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-mxj</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -264,6 +266,11 @@
         <dependency>
             <groupId>org.kill-bill.billing.plugin</groupId>
             <artifactId>killbill-plugin-api-notification</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.kill-bill.billing.plugin</groupId>
+            <artifactId>killbill-plugin-api-usage</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.kill-bill.commons</groupId>

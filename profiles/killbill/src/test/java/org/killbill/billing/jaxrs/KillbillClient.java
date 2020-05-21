@@ -79,9 +79,7 @@ public abstract class KillbillClient extends GuicyKillbillTestSuiteWithEmbeddedD
     protected static final ImmutableMap<String, String> NULL_PLUGIN_PROPERTIES = null;
     protected static final ImmutableList<AuditLog> EMPTY_AUDIT_LOGS = ImmutableList.<AuditLog>of();
 
-
-
-    protected final long DEFAULT_WAIT_COMPLETION_TIMEOUT_SEC = 10;
+    protected final long DEFAULT_WAIT_COMPLETION_TIMEOUT_SEC = 60;
 
     protected static final String PLUGIN_NAME = "noop";
 
@@ -214,22 +212,30 @@ public abstract class KillbillClient extends GuicyKillbillTestSuiteWithEmbeddedD
     }
 
     protected Subscription createSubscription(final UUID accountId, final String bundleExternalKey, final String productName,
-                                              final ProductCategory productCategory, final BillingPeriod billingPeriod, final boolean waitCompletion) throws Exception {
+                                              final ProductCategory productCategory, final BillingPeriod billingPeriod) throws Exception {
         final Account account = accountApi.getAccount(accountId, requestOptions);
-        if (account.getBillCycleDayLocal() == null || account.getBillCycleDayLocal() == 0) {
+        // ANNUAL subscriptions are SUBSCRIPTION aligned
+        if (billingPeriod == BillingPeriod.MONTHLY && (account.getBillCycleDayLocal() == null || account.getBillCycleDayLocal() == 0)) {
             callbackServlet.pushExpectedEvent(ExtBusEventType.ACCOUNT_CHANGE);
         }
         callbackServlet.pushExpectedEvents(ExtBusEventType.ENTITLEMENT_CREATION, ExtBusEventType.SUBSCRIPTION_CREATION, ExtBusEventType.SUBSCRIPTION_CREATION, ExtBusEventType.INVOICE_CREATION);
 
+        final String externalKey = UUID.randomUUID().toString();
         final Subscription input = new Subscription();
         input.setAccountId(accountId);
-        input.setExternalKey(bundleExternalKey);
+        input.setBundleExternalKey(bundleExternalKey);
+        input.setExternalKey(externalKey);
         input.setProductName(productName);
         input.setProductCategory(productCategory);
         input.setBillingPeriod(billingPeriod);
         input.setPriceList(PriceListSet.DEFAULT_PRICELIST_NAME);
-        final Subscription subscription = subscriptionApi.createSubscription(input, null, null, true, false, null, waitCompletion, waitCompletion ? DEFAULT_WAIT_COMPLETION_TIMEOUT_SEC : -1L, NULL_PLUGIN_PROPERTIES, requestOptions);
+        final Subscription subscription = subscriptionApi.createSubscription(input, null, null, true, false, true, DEFAULT_WAIT_COMPLETION_TIMEOUT_SEC, NULL_PLUGIN_PROPERTIES, requestOptions);
         callbackServlet.assertListenerStatus();
+
+        assertEquals(subscription.getExternalKey(), externalKey);
+        if (bundleExternalKey != null) {
+            assertEquals(subscription.getBundleExternalKey(), bundleExternalKey);
+        }
 
         return subscription;
     }
@@ -252,7 +258,7 @@ public abstract class KillbillClient extends GuicyKillbillTestSuiteWithEmbeddedD
 
         // Add a bundle, subscription and move the clock to get the first invoice
         final Subscription subscriptionJson = createSubscription(accountJson.getAccountId(), UUID.randomUUID().toString(), productName,
-                                                                 ProductCategory.BASE, BillingPeriod.MONTHLY, true);
+                                                                 ProductCategory.BASE, BillingPeriod.MONTHLY);
         assertNotNull(subscriptionJson);
 
         callbackServlet.pushExpectedEvents(ExtBusEventType.SUBSCRIPTION_PHASE, ExtBusEventType.INVOICE_CREATION);
@@ -284,7 +290,7 @@ public abstract class KillbillClient extends GuicyKillbillTestSuiteWithEmbeddedD
 
         // Add a bundle, subscription and move the clock to get the first invoice
         final Subscription subscriptionJson = createSubscription(accountJson.getAccountId(), UUID.randomUUID().toString(), "Shotgun",
-                                                                ProductCategory.BASE, BillingPeriod.MONTHLY, true);
+                                                                ProductCategory.BASE, BillingPeriod.MONTHLY);
         assertNotNull(subscriptionJson);
 
         callbackServlet.pushExpectedEvents(ExtBusEventType.SUBSCRIPTION_PHASE, ExtBusEventType.INVOICE_CREATION);
@@ -301,7 +307,7 @@ public abstract class KillbillClient extends GuicyKillbillTestSuiteWithEmbeddedD
 
         // Add a bundle, subscription and move the clock to get the first invoice
         final Subscription subscriptionJson = createSubscription(accountJson.getAccountId(), UUID.randomUUID().toString(), "Shotgun",
-                                                                ProductCategory.BASE, BillingPeriod.MONTHLY, true);
+                                                                ProductCategory.BASE, BillingPeriod.MONTHLY);
         assertNotNull(subscriptionJson);
 
         return accountJson;
@@ -314,7 +320,7 @@ public abstract class KillbillClient extends GuicyKillbillTestSuiteWithEmbeddedD
 
         // Add a bundle, subscription and move the clock to get the first invoice
         final Subscription subscriptionJson = createSubscription(accountJson.getAccountId(), UUID.randomUUID().toString(), "Shotgun",
-                                                                ProductCategory.BASE, BillingPeriod.MONTHLY, true);
+                                                                ProductCategory.BASE, BillingPeriod.MONTHLY);
         assertNotNull(subscriptionJson);
 
         // No payment will be triggered as the account doesn't have a payment method

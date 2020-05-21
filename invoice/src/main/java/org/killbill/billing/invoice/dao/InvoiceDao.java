@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014-2017 Groupon, Inc
- * Copyright 2014-2017 The Billing Project, LLC
+ * Copyright 2014-2019 Groupon, Inc
+ * Copyright 2014-2019 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -21,6 +21,7 @@ package org.killbill.billing.invoice.dao;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import javax.annotation.Nullable;
@@ -34,16 +35,27 @@ import org.killbill.billing.invoice.InvoiceDispatcher.FutureAccountNotifications
 import org.killbill.billing.invoice.api.Invoice;
 import org.killbill.billing.invoice.api.InvoiceApiException;
 import org.killbill.billing.invoice.api.InvoiceStatus;
+import org.killbill.billing.junction.BillingEventSet;
+import org.killbill.billing.util.api.AuditLevel;
+import org.killbill.billing.util.audit.AuditLogWithHistory;
 import org.killbill.billing.util.entity.Pagination;
 import org.killbill.billing.util.entity.dao.EntityDao;
 
 public interface InvoiceDao extends EntityDao<InvoiceModelDao, Invoice, InvoiceApiException> {
 
+    // Used by InvoiceDispatcher only for regular invoice runs
     void createInvoice(final InvoiceModelDao invoice,
+                       final BillingEventSet billingEvents,
+                       final Set<InvoiceTrackingModelDao> trackingIds,
                        final FutureAccountNotifications callbackDateTimePerSubscriptions,
+                       final ExistingInvoiceMetadata existingInvoiceMetadata,
                        final InternalCallContext context);
 
-    List<InvoiceItemModelDao> createInvoices(final List<InvoiceModelDao> invoices, final InternalCallContext context);
+    // Used by APIs, for HA, etc.
+    List<InvoiceItemModelDao> createInvoices(final List<InvoiceModelDao> invoices,
+                                             final BillingEventSet billingEvents,
+                                             final Set<InvoiceTrackingModelDao> trackingIds,
+                                             final InternalCallContext context);
 
     public void setFutureAccountNotificationsForEmptyInvoice(final UUID accountId, final FutureAccountNotifications callbackDateTimePerSubscriptions,
                                                              final InternalCallContext context);
@@ -54,7 +66,7 @@ public interface InvoiceDao extends EntityDao<InvoiceModelDao, Invoice, InvoiceA
 
     List<InvoiceModelDao> getInvoicesByAccount(final Boolean includeVoidedInvoices, InternalTenantContext context);
 
-    List<InvoiceModelDao> getInvoicesByAccount(final Boolean includeVoidedInvoices, LocalDate fromDate, InternalTenantContext context);
+    List<InvoiceModelDao> getInvoicesByAccount(final Boolean includeVoidedInvoices, LocalDate fromDate, LocalDate upToDate, InternalTenantContext context);
 
     List<InvoiceModelDao> getInvoicesBySubscription(UUID subscriptionId, InternalTenantContext context);
 
@@ -70,18 +82,20 @@ public interface InvoiceDao extends EntityDao<InvoiceModelDao, Invoice, InvoiceA
 
     InvoicePaymentModelDao getInvoicePaymentByCookieId(String cookieId, InternalTenantContext internalTenantContext);
 
+    InvoicePaymentModelDao getInvoicePayment(UUID invoicePaymentId, InternalTenantContext internalTenantContext);
+
     BigDecimal getAccountBalance(UUID accountId, InternalTenantContext context);
 
     BigDecimal getAccountCBA(UUID accountId, InternalTenantContext context);
 
-    List<InvoiceModelDao> getUnpaidInvoicesByAccountId(UUID accountId, @Nullable LocalDate upToDate, InternalTenantContext context);
+    List<InvoiceModelDao> getUnpaidInvoicesByAccountId(UUID accountId, @Nullable LocalDate startDate, @Nullable LocalDate upToDate, InternalTenantContext context);
 
     // Include migrated invoices
     List<InvoiceModelDao> getAllInvoicesByAccount(final Boolean includeVoidedInvoices, InternalTenantContext context);
 
-    InvoicePaymentModelDao postChargeback(UUID paymentId, String chargebackTransactionExternalKey, BigDecimal amount, Currency currency, InternalCallContext context) throws InvoiceApiException;
+    InvoicePaymentModelDao postChargeback(UUID paymentId, final UUID paymentAttemptId, String chargebackTransactionExternalKey, BigDecimal amount, Currency currency, InternalCallContext context) throws InvoiceApiException;
 
-    InvoicePaymentModelDao postChargebackReversal(UUID paymentId, String chargebackTransactionExternalKey, InternalCallContext context) throws InvoiceApiException;
+    InvoicePaymentModelDao postChargebackReversal(UUID paymentId, final UUID paymentAttemptId, String chargebackTransactionExternalKey, InternalCallContext context) throws InvoiceApiException;
 
     InvoiceItemModelDao doCBAComplexity(InvoiceModelDao invoice, InternalCallContext context) throws InvoiceApiException;
 
@@ -101,7 +115,7 @@ public interface InvoiceDao extends EntityDao<InvoiceModelDao, Invoice, InvoiceA
      * @return the created invoice payment object associated with this refund
      * @throws InvoiceApiException
      */
-    InvoicePaymentModelDao createRefund(UUID paymentId, BigDecimal amount, boolean isInvoiceAdjusted, Map<UUID, BigDecimal> invoiceItemIdsWithAmounts,
+    InvoicePaymentModelDao createRefund(UUID paymentId, UUID paymentAttemptId, BigDecimal amount, boolean isInvoiceAdjusted, Map<UUID, BigDecimal> invoiceItemIdsWithAmounts,
                                         String transactionExternalKey, InternalCallContext context) throws InvoiceApiException;
 
     BigDecimal getRemainingAmountPaid(UUID invoicePaymentId, InternalTenantContext context);
@@ -141,9 +155,9 @@ public interface InvoiceDao extends EntityDao<InvoiceModelDao, Invoice, InvoiceA
      */
     void deleteCBA(UUID accountId, UUID invoiceId, UUID invoiceItemId, InternalCallContext context) throws InvoiceApiException;
 
-    void notifyOfPaymentInit(InvoicePaymentModelDao invoicePayment, InternalCallContext context);
+    void notifyOfPaymentInit(InvoicePaymentModelDao invoicePayment, UUID paymentAttemptId, InternalCallContext context);
 
-    void notifyOfPaymentCompletion(InvoicePaymentModelDao invoicePayment, InternalCallContext context);
+    void notifyOfPaymentCompletion(InvoicePaymentModelDao invoicePayment, UUID paymentAttemptId, InternalCallContext context);
 
     /**
      * @param accountId the account for which we need to rebalance the CBA
@@ -218,4 +232,13 @@ public interface InvoiceDao extends EntityDao<InvoiceModelDao, Invoice, InvoiceA
      * @throws InvoiceApiException if any unexpected error occurs
      */
     List<InvoiceItemModelDao> getInvoiceItemsByParentInvoice(UUID parentInvoiceId, final InternalTenantContext context) throws InvoiceApiException;
+
+    List<InvoiceTrackingModelDao> getTrackingsByDateRange(LocalDate startDate, LocalDate endDate, InternalCallContext context);
+
+    public List<AuditLogWithHistory> getInvoiceAuditLogsWithHistoryForId(final UUID invoiceId, final AuditLevel auditLevel, final InternalTenantContext context);
+
+    public List<AuditLogWithHistory> getInvoiceItemAuditLogsWithHistoryForId(final UUID invoiceItemId, final AuditLevel auditLevel, final InternalTenantContext context);
+
+    public List<AuditLogWithHistory> getInvoicePaymentAuditLogsWithHistoryForId(final UUID invoicePaymentId, final AuditLevel auditLevel, final InternalTenantContext context);
+
 }

@@ -4,9 +4,14 @@ CREATE DOMAIN datetime AS timestamp without time zone;
 /* TEXT in MySQL is smaller then MEDIUMTEXT */
 DROP DOMAIN IF EXISTS mediumtext CASCADE;
 CREATE DOMAIN mediumtext AS text;
+DROP DOMAIN IF EXISTS longtext CASCADE;
+CREATE DOMAIN longtext AS text;
 /* PostgreSQL uses BYTEA to manage all BLOB types */
 DROP DOMAIN IF EXISTS mediumblob CASCADE;
 CREATE DOMAIN mediumblob AS bytea;
+DROP DOMAIN IF EXISTS blob CASCADE;
+CREATE DOMAIN blob AS bytea;
+
 
 CREATE OR REPLACE LANGUAGE plpgsql;
 

@@ -1,7 +1,7 @@
 /*
  * Copyright 2010-2013 Ning, Inc.
- * Copyright 2014 Groupon, Inc
- * Copyright 2014 The Billing Project, LLC
+ * Copyright 2014-2018 Groupon, Inc
+ * Copyright 2014-2018 The Billing Project, LLC
  *
  * The Billing Project licenses this file to you under the Apache License, version 2.0
  * (the "License"); you may not use this file except in compliance with the
@@ -18,6 +18,8 @@
 
 package org.killbill.billing.junction;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.joda.time.DateTime;
@@ -29,9 +31,10 @@ import org.killbill.billing.account.api.AccountData;
 import org.killbill.billing.account.api.AccountUserApi;
 import org.killbill.billing.api.TestApiListener;
 import org.killbill.billing.catalog.DefaultCatalogService;
-import org.killbill.billing.catalog.api.Catalog;
 import org.killbill.billing.catalog.api.CatalogService;
 import org.killbill.billing.catalog.api.Currency;
+import org.killbill.billing.catalog.api.StaticCatalog;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.entitlement.DefaultEntitlementService;
 import org.killbill.billing.entitlement.EntitlementService;
 import org.killbill.billing.entitlement.api.EntitlementApi;
@@ -90,11 +93,11 @@ public abstract class JunctionTestSuiteWithEmbeddedDB extends GuicyKillbillTestS
     @Inject
     protected InternalCallContextFactory internalCallContextFactory;
 
-    protected Catalog catalog;
+    protected VersionedCatalog catalog;
 
     @Override
-    protected KillbillConfigSource getConfigSource() {
-        return getConfigSource("/junction.properties");
+    protected KillbillConfigSource getConfigSource(final Map<String, String> extraProperties) {
+        return getConfigSource("/junction.properties", extraProperties);
     }
 
     @BeforeClass(groups = "slow")
@@ -103,7 +106,7 @@ public abstract class JunctionTestSuiteWithEmbeddedDB extends GuicyKillbillTestS
             return;
         }
 
-        final Injector injector = Guice.createInjector(Stage.PRODUCTION, new TestJunctionModuleWithEmbeddedDB(configSource));
+        final Injector injector = Guice.createInjector(Stage.PRODUCTION, new TestJunctionModuleWithEmbeddedDB(configSource, clock));
         injector.injectMembers(this);
     }
 
@@ -127,9 +130,9 @@ public abstract class JunctionTestSuiteWithEmbeddedDB extends GuicyKillbillTestS
         stopTestFramework();
     }
 
-    private Catalog initCatalog(final CatalogService catalogService) throws Exception {
+    private VersionedCatalog initCatalog(final CatalogService catalogService) throws Exception {
         ((DefaultCatalogService) catalogService).loadCatalog();
-        final Catalog catalog = catalogService.getFullCatalog(true, true, internalCallContext);
+        final VersionedCatalog catalog = catalogService.getFullCatalog(true, true, internalCallContext);
         assertNotNull(catalog);
         return catalog;
     }
@@ -173,7 +176,7 @@ public abstract class JunctionTestSuiteWithEmbeddedDB extends GuicyKillbillTestS
     }
 
     private void startBusAndRegisterListener(final BusService busService, final TestApiListener testListener) throws Exception {
-        busService.getBus().start();
+        busService.getBus().startQueue();
         busService.getBus().register(testListener);
     }
 
@@ -191,7 +194,7 @@ public abstract class JunctionTestSuiteWithEmbeddedDB extends GuicyKillbillTestS
 
     private void stopBusAndUnregisterListener(final BusService busService, final TestApiListener testListener) throws Exception {
         busService.getBus().unregister(testListener);
-        busService.getBus().stop();
+        busService.getBus().stopQueue();
     }
 
     private void stopSubscriptionService(final SubscriptionBaseService subscriptionBaseService) throws Exception {

@@ -36,12 +36,14 @@ import org.killbill.billing.account.api.AccountApiException;
 import org.killbill.billing.account.api.AccountInternalApi;
 import org.killbill.billing.account.api.ImmutableAccountData;
 import org.killbill.billing.callcontext.InternalTenantContext;
-import org.killbill.billing.catalog.api.Catalog;
+import org.killbill.billing.catalog.api.BillingAlignment;
 import org.killbill.billing.catalog.api.CatalogApiException;
 import org.killbill.billing.catalog.api.CatalogInternalApi;
 import org.killbill.billing.catalog.api.PhaseType;
 import org.killbill.billing.catalog.api.PlanPhaseSpecifier;
 import org.killbill.billing.catalog.api.ProductCategory;
+import org.killbill.billing.catalog.api.StaticCatalog;
+import org.killbill.billing.catalog.api.VersionedCatalog;
 import org.killbill.billing.entitlement.AccountEventsStreams;
 import org.killbill.billing.entitlement.EventsStream;
 import org.killbill.billing.entitlement.api.BlockingState;
@@ -58,6 +60,8 @@ import org.killbill.billing.subscription.api.SubscriptionBaseInternalApi;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseApiException;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseBundle;
 import org.killbill.billing.subscription.api.user.SubscriptionBaseTransition;
+import org.killbill.billing.util.audit.dao.AuditDao;
+import org.killbill.billing.util.bcd.BillCycleDayCalculator;
 import org.killbill.billing.util.cache.CacheControllerDispatcher;
 import org.killbill.billing.util.callcontext.InternalCallContextFactory;
 import org.killbill.billing.util.callcontext.TenantContext;
@@ -98,6 +102,7 @@ public class EventsStreamBuilder {
                                final PersistentBus eventBus,
                                final CacheControllerDispatcher cacheControllerDispatcher,
                                final NonEntityDao nonEntityDao,
+                               final AuditDao auditDao,
                                final InternalCallContextFactory internalCallContextFactory) {
         this.accountInternalApi = accountInternalApi;
         this.subscriptionInternalApi = subscriptionInternalApi;
@@ -105,8 +110,8 @@ public class EventsStreamBuilder {
         this.checker = checker;
         this.clock = clock;
         this.internalCallContextFactory = internalCallContextFactory;
-        this.defaultBlockingStateDao = new DefaultBlockingStateDao(dbi, roDbi, clock, notificationQueueService, eventBus, cacheControllerDispatcher, nonEntityDao, internalCallContextFactory);
-        this.blockingStateDao = new OptimizedProxyBlockingStateDao(this, subscriptionInternalApi, dbi, roDbi, clock, notificationQueueService, eventBus, cacheControllerDispatcher, nonEntityDao, internalCallContextFactory);
+        this.defaultBlockingStateDao = new DefaultBlockingStateDao(dbi, roDbi, clock, notificationQueueService, eventBus, cacheControllerDispatcher, nonEntityDao, auditDao, internalCallContextFactory);
+        this.blockingStateDao = new OptimizedProxyBlockingStateDao(this, subscriptionInternalApi, dbi, roDbi, clock, notificationQueueService, eventBus, cacheControllerDispatcher, nonEntityDao, auditDao, internalCallContextFactory);
     }
 
     public EventsStream refresh(final EventsStream eventsStream, final TenantContext tenantContext) throws EntitlementApiException {
@@ -134,7 +139,7 @@ public class EventsStreamBuilder {
         // Retrieve the subscriptions (map bundle id -> subscriptions)
         final Map<UUID, List<SubscriptionBase>> subscriptions;
         try {
-            final Catalog catalog = getCatalog(internalTenantContext);
+            final VersionedCatalog catalog = getCatalog(internalTenantContext);
             subscriptions = subscriptionInternalApi.getSubscriptionsForAccount(catalog, internalTenantContext);
             return buildForAccount(subscriptions, catalog, internalTenantContext);
         } catch (final SubscriptionBaseApiException e) {
@@ -143,13 +148,13 @@ public class EventsStreamBuilder {
     }
 
     // Special signature for ProxyBlockingStateDao to save a DAO call
-    public AccountEventsStreams buildForAccount(final Map<UUID, List<SubscriptionBase>> subscriptions, final Catalog catalog, final InternalTenantContext internalTenantContext) throws EntitlementApiException {
+    public AccountEventsStreams buildForAccount(final Map<UUID, List<SubscriptionBase>> subscriptions, final VersionedCatalog catalog, final InternalTenantContext internalTenantContext) throws EntitlementApiException {
         // Retrieve the account
         final ImmutableAccountData account;
         final int accountBCD;
         try {
             account = accountInternalApi.getImmutableAccountDataByRecordId(internalTenantContext.getAccountRecordId(), internalTenantContext);
-            accountBCD = accountInternalApi.getBCD(account.getId(), internalTenantContext);
+            accountBCD = accountInternalApi.getBCD(internalTenantContext);
         } catch (final AccountApiException e) {
             throw new EntitlementApiException(e);
         }
@@ -256,19 +261,23 @@ public class EventsStreamBuilder {
     }
 
     public EventsStream buildForEntitlement(final UUID entitlementId, final InternalTenantContext internalTenantContext) throws EntitlementApiException {
-        final SubscriptionBaseBundle bundle;
-        final SubscriptionBase subscription;
-        final List<SubscriptionBase> subscriptionsForBundle;
         try {
-            subscription = subscriptionInternalApi.getSubscriptionFromId(entitlementId, internalTenantContext);
-            bundle = subscriptionInternalApi.getBundleFromId(subscription.getBundleId(), internalTenantContext);
-            subscriptionsForBundle = subscriptionInternalApi.getSubscriptionsForBundle(subscription.getBundleId(), null, internalTenantContext);
+            final SubscriptionBase subscription = subscriptionInternalApi.getSubscriptionFromId(entitlementId, internalTenantContext);
+            return buildForEntitlement(subscription, internalTenantContext);
         } catch (final SubscriptionBaseApiException e) {
             throw new EntitlementApiException(e);
         }
-
-        return buildForEntitlement(bundle, subscription, subscriptionsForBundle, internalTenantContext);
     }
+
+    public EventsStream buildForEntitlement(final String externalKey, final InternalTenantContext internalTenantContext) throws EntitlementApiException {
+        try {
+            final SubscriptionBase subscription = subscriptionInternalApi.getSubscriptionFromExternalKey(externalKey, internalTenantContext);
+            return buildForEntitlement(subscription, internalTenantContext);
+        } catch (final SubscriptionBaseApiException e) {
+            throw new EntitlementApiException(e);
+        }
+    }
+
 
     public EventsStream buildForEntitlement(final SubscriptionBaseBundle bundle,
                                             final SubscriptionBase subscription,
@@ -276,7 +285,7 @@ public class EventsStreamBuilder {
                                             final InternalTenantContext internalTenantContext) throws EntitlementApiException {
         final int accountBCD;
         try {
-            accountBCD = accountInternalApi.getBCD(bundle.getAccountId(), internalTenantContext);
+            accountBCD = accountInternalApi.getBCD(internalTenantContext);
         } catch (final AccountApiException e) {
             throw new EntitlementApiException(e);
         }
@@ -298,7 +307,7 @@ public class EventsStreamBuilder {
             throw new EntitlementApiException(e);
         }
 
-        final Catalog catalog = getCatalog(internalTenantContext);
+        final VersionedCatalog catalog = getCatalog(internalTenantContext);
 
         // Retrieve the blocking states
         final List<BlockingState> blockingStatesForAccount = defaultBlockingStateDao.getBlockingAllForAccountRecordId(catalog, internalTenantContext);
@@ -314,7 +323,7 @@ public class EventsStreamBuilder {
                                             final SubscriptionBase baseSubscription,
                                             final Collection<SubscriptionBase> allSubscriptionsForBundle,
                                             final int accountBCD,
-                                            final Catalog catalog,
+                                            final VersionedCatalog catalog,
                                             final InternalTenantContext internalTenantContext) throws EntitlementApiException {
         final Map<UUID, Integer> bcdCache = new HashMap<UUID, Integer>();
         return buildForEntitlement(blockingStatesForAccount, account, bundle, baseSubscription, baseSubscription, allSubscriptionsForBundle, accountBCD, bcdCache, catalog, internalTenantContext);
@@ -328,7 +337,7 @@ public class EventsStreamBuilder {
                                              final Collection<SubscriptionBase> allSubscriptionsForBundle,
                                              final int accountBCD,
                                              final Map<UUID, Integer> bcdCache,
-                                             final Catalog catalog,
+                                             final VersionedCatalog catalog,
                                              final InternalTenantContext internalTenantContext) throws EntitlementApiException {
         // Optimization: build lookup tables for blocking states states
         final Collection<BlockingState> accountBlockingStates = new LinkedList<BlockingState>();
@@ -393,17 +402,16 @@ public class EventsStreamBuilder {
                                              final Collection<BlockingState> blockingStates,
                                              final int accountBCD,
                                              final Map<UUID, Integer> bcdCache,
-                                             final Catalog catalog,
+                                             final VersionedCatalog catalog,
                                              final InternalTenantContext internalTenantContext) throws EntitlementApiException {
 
         try {
-            final int defaultAlignmentDay = subscriptionInternalApi.getDefaultBillCycleDayLocal(bcdCache,
-                                                                                                subscription,
-                                                                                                baseSubscription,
-                                                                                                createPlanPhaseSpecifier(subscription),
-                                                                                                accountBCD,
-                                                                                                catalog,
-                                                                                                internalTenantContext);
+            Integer defaultAlignmentDay = null;
+            final BillingAlignment alignment = subscription.getBillingAlignment(createPlanPhaseSpecifier(subscription), clock.getUTCNow(), catalog);
+
+            if (alignment != BillingAlignment.ACCOUNT || accountBCD != 0) {
+                defaultAlignmentDay = BillCycleDayCalculator.calculateBcdForAlignment(bcdCache, subscription, baseSubscription, alignment, internalTenantContext, accountBCD);
+            }
             return new DefaultEventsStream(account,
                                            bundle,
                                            blockingStates,
@@ -419,6 +427,21 @@ public class EventsStreamBuilder {
         }
     }
 
+
+    private EventsStream buildForEntitlement(final SubscriptionBase subscription, final InternalTenantContext internalTenantContext) throws EntitlementApiException {
+        final SubscriptionBaseBundle bundle;
+        final List<SubscriptionBase> subscriptionsForBundle;
+        try {
+            bundle = subscriptionInternalApi.getBundleFromId(subscription.getBundleId(), internalTenantContext);
+            subscriptionsForBundle = subscriptionInternalApi.getSubscriptionsForBundle(subscription.getBundleId(), null, internalTenantContext);
+        } catch (final SubscriptionBaseApiException e) {
+            throw new EntitlementApiException(e);
+        }
+
+        return buildForEntitlement(bundle, subscription, subscriptionsForBundle, internalTenantContext);
+    }
+
+
     private PlanPhaseSpecifier createPlanPhaseSpecifier(final SubscriptionBase subscription) {
         final String planName;
         final PhaseType phaseType;
@@ -433,8 +456,8 @@ public class EventsStreamBuilder {
         return new PlanPhaseSpecifier(planName, phaseType);
     }
 
-    private Catalog getCatalog(final InternalTenantContext internalTenantContext) throws EntitlementApiException {
-        final Catalog catalog;
+    private VersionedCatalog getCatalog(final InternalTenantContext internalTenantContext) throws EntitlementApiException {
+        final VersionedCatalog catalog;
         try {
             catalog = catalogInternalApi.getFullCatalog(true, true, internalTenantContext);
         } catch (final CatalogApiException e) {

@@ -85,25 +85,27 @@ public class ControlPluginRunner {
         BigDecimal inputAmount = amount;
         Currency inputCurrency = currency;
         Iterable<PluginProperty> inputPluginProperties = pluginProperties;
-        PaymentControlContext inputPaymentControlContext = new DefaultPaymentControlContext(account,
-                                                                                            paymentMethodId,
-                                                                                            pluginName,
-                                                                                            paymentAttemptId,
-                                                                                            paymentId,
-                                                                                            paymentExternalKey,
-                                                                                            paymentTransactionId,
-                                                                                            paymentTransactionExternalKey,
-                                                                                            paymentApiType,
-                                                                                            transactionType,
-                                                                                            hppType,
-                                                                                            amount,
-                                                                                            currency,
-                                                                                            processedAmount,
-                                                                                            processedCurrency,
-                                                                                            isApiPayment,
-                                                                                            callContext);
 
         for (final String controlPluginName : paymentControlPluginNames) {
+
+            final PaymentControlContext inputPaymentControlContext = new DefaultPaymentControlContext(account,
+                                                                                                      inputPaymentMethodId,
+                                                                                                      controlPluginName,
+                                                                                                      paymentAttemptId,
+                                                                                                      paymentId,
+                                                                                                      paymentExternalKey,
+                                                                                                      paymentTransactionId,
+                                                                                                      paymentTransactionExternalKey,
+                                                                                                      paymentApiType,
+                                                                                                      transactionType,
+                                                                                                      hppType,
+                                                                                                      inputAmount,
+                                                                                                      inputCurrency,
+                                                                                                      processedAmount,
+                                                                                                      processedCurrency,
+                                                                                                      isApiPayment,
+                                                                                                      callContext);
+
             final PaymentControlPluginApi plugin = paymentControlPluginRegistry.getServiceForName(controlPluginName);
             if (plugin == null) {
                 // First call to plugin, we log warn, if plugin is not registered
@@ -119,6 +121,12 @@ public class ControlPluginRunner {
             }
 
             if (prevResult.getAdjustedPaymentMethodId() != null) {
+                // We only allow setting the paymentMethodId but disallow overwriting an existing paymentMethodId for a given Payment. See #1097
+                if (paymentMethodId != null) {
+                    throw new PaymentControlApiException(String.format("Not allowed to overwrite paymentMethodId '%s' for payment '%s'",
+                                                                       paymentMethodId, paymentId));
+                }
+
                 inputPaymentMethodId = prevResult.getAdjustedPaymentMethodId();
             }
             if (prevResult.getAdjustedPluginName() != null) {
@@ -136,23 +144,6 @@ public class ControlPluginRunner {
             if (prevResult.isAborted()) {
                 throw new PaymentControlApiAbortException(controlPluginName);
             }
-            inputPaymentControlContext = new DefaultPaymentControlContext(account,
-                                                                          inputPaymentMethodId,
-                                                                          controlPluginName,
-                                                                          paymentAttemptId,
-                                                                          paymentId,
-                                                                          paymentExternalKey,
-                                                                          paymentTransactionId,
-                                                                          paymentTransactionExternalKey,
-                                                                          paymentApiType,
-                                                                          transactionType,
-                                                                          hppType,
-                                                                          inputAmount,
-                                                                          inputCurrency,
-                                                                          processedAmount,
-                                                                          processedCurrency,
-                                                                          isApiPayment,
-                                                                          callContext);
         }
         // Rebuild latest result to include inputPluginProperties
         prevResult = new DefaultPriorPaymentControlResult(prevResult != null && prevResult.isAborted(), inputPaymentMethodId, inputPaymentMethodName, inputAmount, inputCurrency, inputPluginProperties);

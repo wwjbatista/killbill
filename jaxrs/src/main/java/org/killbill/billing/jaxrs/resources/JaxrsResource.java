@@ -99,7 +99,6 @@ public interface JaxrsResource {
     String QUERY_BLOCKING_STATE_TYPES = "blockingStateTypes";
     String QUERY_BLOCKING_STATE_SVCS = "blockingStateSvcs";
 
-    String QUERY_INVOICE_WITH_ITEMS = "withItems";
     String QUERY_WITH_MIGRATION_INVOICES = "withMigrationInvoices";
     String QUERY_UNPAID_INVOICES_ONLY = "unpaidInvoicesOnly";
     String QUERY_INCLUDE_VOIDED_INVOICES = "includeVoidedInvoices";
@@ -145,8 +144,6 @@ public interface JaxrsResource {
 
     String QUERY_AUDIT = "audit";
 
-    String QUERY_BCD = "bcd";
-
     String QUERY_PARALLEL = "parallel";
 
     String QUERY_AUTO_COMMIT = "autoCommit";
@@ -172,6 +169,8 @@ public interface JaxrsResource {
 
     String SUBSCRIPTIONS = "subscriptions";
     String SUBSCRIPTIONS_PATH = PREFIX + "/" + SUBSCRIPTIONS;
+
+    String EVENTS = "events";
 
     String ENTITLEMENTS = "entitlements";
     String ENTITLEMENTS_PATH = PREFIX + "/" + ENTITLEMENTS;
